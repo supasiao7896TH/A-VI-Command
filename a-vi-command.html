@@ -832,6 +832,12 @@ tailwind.config = {
           <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
           Dashboard
         </h2>
+        <button onclick="LIVE_DATA_ENGINE.refresh([])"
+                title="รีเฟรชข้อมูล"
+                class="p-1.5 rounded-lg transition-all hover:bg-white/5 ml-1"
+                style="color:#475569;">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        </button>
         <div class="flex gap-1">
           <button class="tab-btn active" onclick="APP_CORE.switchTab('overview', this)">ภาพรวม</button>
           <button class="tab-btn" onclick="APP_CORE.switchTab('dividend', this)">ปันผล</button>
@@ -1300,6 +1306,149 @@ const STORAGE_ENGINE = (() => {
 })();
 
 /* ═══════════════════════════════════════════
+   ④ LIVE_DATA_ENGINE (Phase 2)
+═══════════════════════════════════════════ */
+const LIVE_DATA_ENGINE = (() => {
+  'use strict';
+
+  const PROXY_BASE       = 'https://avi-proxy.supasiao.workers.dev';
+  const REFRESH_INTERVAL = 15 * 60 * 1000;
+  const CACHE_TTL        = 10 * 60 * 1000;
+  const _cache           = {};
+  let   _refreshTimer    = null;
+  let   _setChart        = null;
+
+  async function fetchStock(symbol) {
+    const now = Date.now();
+    if (_cache[symbol] && (now - _cache[symbol].ts) < CACHE_TTL) {
+      return _cache[symbol].data;
+    }
+    try {
+      const res  = await fetch(`${PROXY_BASE}/stock?symbol=${encodeURIComponent(symbol)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.error) return null;
+      _cache[symbol] = { data, ts: now };
+      return data;
+    } catch (_) { return null; }
+  }
+
+  async function fetchMultiple(symbols) {
+    const results = await Promise.allSettled(symbols.map(s => fetchStock(s)));
+    const out = {};
+    symbols.forEach((sym, i) => {
+      if (results[i].status === 'fulfilled' && results[i].value) {
+        out[sym] = results[i].value;
+      }
+    });
+    return out;
+  }
+
+  async function updateDashboard() {
+    const setData = await fetchStock('^SET');
+    if (setData) {
+      const setEl = document.getElementById('setIndex');
+      const chgEl = document.getElementById('setChange');
+      if (setEl) setEl.textContent = setData.price.toLocaleString('th-TH', { minimumFractionDigits: 2 });
+      if (chgEl) {
+        const up = setData.change >= 0;
+        chgEl.textContent = `${up ? '▲' : '▼'} ${Math.abs(setData.change).toFixed(2)} (${setData.changePct.toFixed(2)}%)`;
+        chgEl.style.color = up ? 'var(--emerald-400)' : 'var(--rose-400)';
+      }
+    }
+    const fxData = await fetchStock('USDTHB=X');
+    if (fxData) {
+      const fxEl   = document.getElementById('usdthb');
+      const fxNote = document.getElementById('usdthbNote');
+      if (fxEl)   fxEl.textContent = fxData.price.toFixed(2) + ' ฿';
+      if (fxNote) {
+        const up = fxData.change >= 0;
+        fxNote.textContent = `${up ? '▲' : '▼'} ${Math.abs(fxData.change).toFixed(4)} วันนี้`;
+        fxNote.style.color = up ? 'var(--rose-400)' : 'var(--emerald-400)';
+      }
+    }
+  }
+
+  async function updateWatchlistPrices(watchlist) {
+    if (!watchlist || watchlist.length === 0) return;
+    const symbols = watchlist.map(w => `${w.symbol}.BK`);
+    const prices  = await fetchMultiple(symbols);
+    const fullEl  = document.getElementById('watchlistFull');
+    if (!fullEl) return prices;
+    const cards = fullEl.querySelectorAll('[data-symbol]');
+    cards.forEach(card => {
+      const sym  = card.getAttribute('data-symbol');
+      const data = prices[`${sym}.BK`];
+      if (!data) return;
+      const priceEl = card.querySelector('.wl-price');
+      const chgEl   = card.querySelector('.wl-change');
+      const up      = data.change >= 0;
+      if (priceEl) priceEl.textContent = data.price.toFixed(2) + ' ฿';
+      if (chgEl) {
+        chgEl.textContent = `${up ? '▲' : '▼'} ${Math.abs(data.changePct).toFixed(2)}%`;
+        chgEl.style.color = up ? 'var(--emerald-400)' : 'var(--rose-400)';
+      }
+    });
+    return prices;
+  }
+
+  async function updateTicker() {
+    const TICKER_SYMBOLS = [
+      'PTT.BK','PTTEP.BK','SCB.BK','KBANK.BK','BBL.BK',
+      'CPALL.BK','AOT.BK','BEM.BK','MINT.BK','GPSC.BK',
+      'OR.BK','ADVANC.BK'
+    ];
+    const prices = await fetchMultiple(TICKER_SYMBOLS);
+    const inner  = document.getElementById('tickerInner');
+    if (!inner || Object.keys(prices).length === 0) return;
+    const items = Object.entries(prices).map(([sym, d]) => ({
+      sym:   sym.replace('.BK', ''),
+      price: d.price.toFixed(2),
+      chg:   `${d.change >= 0 ? '+' : ''}${d.change.toFixed(2)}`,
+      pct:   `${d.changePct >= 0 ? '+' : ''}${d.changePct.toFixed(2)}%`,
+      up:    d.change >= 0
+    }));
+    const all = [...items, ...items];
+    inner.innerHTML = all.map(s => `
+      <span class="stock-chip">
+        <span class="sym">${s.sym}</span>
+        <span>${s.price}</span>
+        <span class="${s.up ? 'up' : 'down'}">${s.chg} (${s.pct})</span>
+      </span>`).join('');
+  }
+
+  function setChartInstance(chart) { _setChart = chart; }
+
+  async function refresh(watchlist) {
+    const statusEl = document.getElementById('systemStatusText');
+    if (statusEl) statusEl.textContent = 'กำลังอัปเดตข้อมูล...';
+    await Promise.allSettled([
+      updateDashboard(),
+      updateTicker(),
+      updateWatchlistPrices(watchlist),
+    ]);
+    const now = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit' }).format(new Date());
+    if (statusEl) statusEl.textContent = `อัปเดตล่าสุด ${now}`;
+    STATE_STORE.set('lastRefresh', Date.now());
+  }
+
+  function startAutoRefresh(getWatchlist) {
+    if (_refreshTimer) clearInterval(_refreshTimer);
+    _refreshTimer = setInterval(() => refresh(getWatchlist()), REFRESH_INTERVAL);
+  }
+
+  function stopAutoRefresh() {
+    if (_refreshTimer) { clearInterval(_refreshTimer); _refreshTimer = null; }
+  }
+
+  return {
+    fetchStock, fetchMultiple,
+    updateDashboard, updateWatchlistPrices, updateTicker,
+    refresh, startAutoRefresh, stopAutoRefresh, setChartInstance,
+  };
+})();
+
+/* ═══════════════════════════════════════════
    ⑥ CLAUDE_AI_BRIDGE
 ═══════════════════════════════════════════ */
 const CLAUDE_AI_BRIDGE = (() => {
@@ -1529,9 +1678,13 @@ const UI_RENDERER = (() => {
             </div>`;
         } else {
           full.innerHTML = items.map(i => `
-            <div class="metric-card flex items-center justify-between">
+            <div class="metric-card flex items-center justify-between" data-symbol="${i.symbol}">
               <div>
-                <p class="text-xs font-mono text-gold font-semibold">${i.symbol}</p>
+                <div class="flex items-center gap-2">
+                  <p class="text-xs font-mono text-gold font-semibold">${i.symbol}</p>
+                  <span class="wl-price text-xs font-mono" style="color:var(--teal-400);">—</span>
+                  <span class="wl-change text-xs font-mono" style="color:#475569;">—</span>
+                </div>
                 <p class="text-xs" style="color:#64748b;">${i.name || '—'}</p>
                 ${i.note ? `<p class="text-xs mt-0.5 italic" style="color:#475569;">📝 ${i.note}</p>` : ''}
               </div>
@@ -1568,7 +1721,7 @@ const UI_RENDERER = (() => {
     initChart() {
       const ctx = document.getElementById('setChart');
       if (!ctx) return;
-      new Chart(ctx, {
+      const chart = new Chart(ctx, {
         type: 'line',
         data: {
           labels: APP_CONFIG.SET_CHART_DATA.labels,
@@ -1604,6 +1757,7 @@ const UI_RENDERER = (() => {
           }
         }
       });
+      return chart;
     }
   };
 })();
@@ -1625,11 +1779,15 @@ const APP_CORE = (() => {
     try {
       lucide.createIcons();
       UI_RENDERER.initTicker();
-      UI_RENDERER.initChart();
+      const chart = UI_RENDERER.initChart();
+      if (chart) LIVE_DATA_ENGINE.setChartInstance(chart);
       await _loadSettings();
       await _loadWatchlist();
       _renderWelcome();
       _updateSystemStatus(true);
+      // Phase 2: Live Data
+      await LIVE_DATA_ENGINE.refresh(_watchlist);
+      LIVE_DATA_ENGINE.startAutoRefresh(() => _watchlist);
     } catch (err) {
       console.error('APP_CORE.init error:', err);
     }
@@ -1897,6 +2055,9 @@ const APP_CORE = (() => {
       UI_RENDERER.updateWatchlistUI(_watchlist);
       hideWatchlistModal();
       UI_RENDERER.toast(`เพิ่ม ${sym} เข้า Watchlist แล้วค่ะ ✨`, 'success');
+      // Phase 2: ดึงราคาทันที
+      await LIVE_DATA_ENGINE.updateWatchlistPrices(_watchlist);
+      lucide.createIcons();
     } catch (err) {
       UI_RENDERER.toast(`เพิ่มไม่สำเร็จ: ${err.message}`, 'error');
     }
@@ -1918,10 +2079,16 @@ const APP_CORE = (() => {
     selectAgent('wi');
     await new Promise(r => setTimeout(r, 300));
     const input = document.getElementById('chatInput');
-    if (input) {
+    if (!input) return;
+    // Phase 2: แนบราคาปัจจุบันไปด้วย
+    const priceData = await LIVE_DATA_ENGINE.fetchStock(`${symbol}.BK`);
+    if (priceData) {
+      const up  = priceData.change >= 0;
+      input.value = `วิเคราะห์หุ้น ${symbol} ให้หน่อยครับ แนว VI เน้นปันผลระยะยาว\n\n📊 ข้อมูลล่าสุด:\n- ราคาปัจจุบัน: ${priceData.price.toFixed(2)} บาท\n- เปลี่ยนแปลง: ${up ? '+' : ''}${priceData.change.toFixed(2)} (${up ? '+' : ''}${priceData.changePct.toFixed(2)}%)\n- สถานะตลาด: ${priceData.marketState}`;
+    } else {
       input.value = `วิเคราะห์หุ้น ${symbol} ให้หน่อยครับ แนว VI เน้นปันผลระยะยาว`;
-      sendMessage();
     }
+    sendMessage();
   }
 
   return {
