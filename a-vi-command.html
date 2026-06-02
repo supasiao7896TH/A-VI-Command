@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>A-VI Command — Investment Virtual Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@0.447.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Noto Sans Thai', 'sans-serif'],
+        display: ['Fraunces', 'serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
+    }
+  }
+}
+</script>
+
+<style>
+  /* ── CSS Variables ─────────────────────────── */
+  :root {
+    --navy-950: #050d1a;
+    --navy-900: #0a1628;
+    --navy-800: #0f2040;
+    --navy-700: #162b55;
+    --navy-600: #1e3a6e;
+    --gold-400: #f0c040;
+    --gold-300: #f5d070;
+    --gold-200: #fae8a0;
+    --teal-400: #2dd4bf;
+    --teal-300: #5eead4;
+    --rose-400: #fb7185;
+    --violet-400: #a78bfa;
+    --emerald-400: #34d399;
+    --amber-400: #fbbf24;
+    --sky-400: #38bdf8;
+    --glass-bg: rgba(15, 32, 64, 0.6);
+    --glass-border: rgba(240, 192, 64, 0.15);
+    --glass-blur: blur(20px);
+    --glow-gold: 0 0 20px rgba(240,192,64,0.3);
+    --glow-teal: 0 0 20px rgba(45,212,191,0.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--navy-950);
+    color: #e2e8f0;
+    font-family: 'Noto Sans Thai', sans-serif;
+    overflow-x: hidden;
+    min-height: 100dvh;
+  }
+
+  /* ── Noise Texture Overlay ─────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── Grid Background ───────────────────────── */
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(240,192,64,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(240,192,64,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* ── Glass Card ────────────────────────────── */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+  }
+
+  .glass-light {
+    background: rgba(255,255,255,0.03);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+  }
+
+  /* ── Isometric Scene ───────────────────────── */
+  .iso-scene {
+    perspective: 1000px;
+    transform-style: preserve-3d;
+  }
+
+  .office-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+
+  @media (max-width: 768px) {
+    .office-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── Room Card ─────────────────────────────── */
+  .room-card {
+    position: relative;
+    cursor: pointer;
+    border-radius: 16px;
+    padding: 16px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid transparent;
+    overflow: hidden;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .room-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: inherit;
+    filter: blur(0);
+    transition: filter 0.3s;
+    border-radius: inherit;
+  }
+
+  .room-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4), var(--room-glow, none);
+  }
+
+  .room-card.active {
+    border-color: var(--room-color, var(--gold-400));
+    box-shadow: 0 0 0 2px var(--room-color, var(--gold-400)),
+                0 20px 40px rgba(0,0,0,0.4),
+                inset 0 0 30px rgba(255,255,255,0.03);
+  }
+
+  /* ── Character Sprite ──────────────────────── */
+  .character {
+    font-size: 2.5rem;
+    animation: float 3s ease-in-out infinite;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+    line-height: 1;
+  }
+
+  .room-card:hover .character {
+    animation: bounce 0.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-6px); }
+  }
+  @keyframes bounce {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-8px); }
+  }
+
+  /* ── Status Dot ────────────────────────────── */
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--emerald-400);
+    box-shadow: 0 0 8px var(--emerald-400);
+    animation: pulse-dot 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  .status-dot.busy { background: var(--amber-400); box-shadow: 0 0 8px var(--amber-400); }
+  .status-dot.offline { background: #64748b; box-shadow: none; animation: none; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.6; transform: scale(0.8); }
+  }
+
+  /* ── Room Themes ───────────────────────────── */
+  .room-command {
+    background: linear-gradient(135deg, rgba(240,192,64,0.12), rgba(240,192,64,0.04));
+    --room-color: var(--gold-400);
+    --room-glow: 0 0 30px rgba(240,192,64,0.2);
+  }
+  .room-research {
+    background: linear-gradient(135deg, rgba(56,189,248,0.12), rgba(56,189,248,0.04));
+    --room-color: var(--sky-400);
+    --room-glow: 0 0 30px rgba(56,189,248,0.2);
+  }
+  .room-intel {
+    background: linear-gradient(135deg, rgba(45,212,191,0.12), rgba(45,212,191,0.04));
+    --room-color: var(--teal-400);
+    --room-glow: 0 0 30px rgba(45,212,191,0.2);
+  }
+  .room-control {
+    background: linear-gradient(135deg, rgba(167,139,250,0.12), rgba(167,139,250,0.04));
+    --room-color: var(--violet-400);
+    --room-glow: 0 0 30px rgba(167,139,250,0.2);
+  }
+
+  /* ── Scan Lines for Rooms ──────────────────── */
+  .room-card::after {
+    content: '';
+    position: absolute;
+    top: -100%; left: 0; right: 0;
+    height: 30%;
+    background: linear-gradient(transparent, rgba(255,255,255,0.03), transparent);
+    animation: scan 4s linear infinite;
+  }
+  @keyframes scan {
+    from { top: -30%; }
+    to   { top: 130%; }
+  }
+
+  /* ── Chat Panel ────────────────────────────── */
+  .chat-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-behavior: smooth;
+  }
+
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-track { background: transparent; }
+  .chat-messages::-webkit-scrollbar-thumb { background: rgba(240,192,64,0.3); border-radius: 2px; }
+
+  .msg-bubble {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    line-height: 1.7;
+    animation: msg-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    word-break: break-word;
+  }
+
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .msg-user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, rgba(240,192,64,0.25), rgba(240,192,64,0.15));
+    border: 1px solid rgba(240,192,64,0.3);
+    color: #fef3c7;
+  }
+
+  .msg-agent {
+    align-self: flex-start;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: #e2e8f0;
+  }
+
+  .msg-system {
+    align-self: center;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #94a3b8;
+    font-size: 0.75rem;
+    padding: 6px 12px;
+    border-radius: 100px;
+  }
+
+  /* ── Typing Indicator ──────────────────────── */
+  .typing-dots {
+    display: inline-flex; gap: 4px; align-items: center;
+    padding: 10px 14px;
+  }
+  .typing-dots span {
+    width: 6px; height: 6px;
+    background: var(--teal-400);
+    border-radius: 50%;
+    animation: typing 1.2s ease-in-out infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30%            { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* ── Dashboard Metric Card ─────────────────── */
+  .metric-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 12px 16px;
+    transition: all 0.2s;
+    cursor: default;
+  }
+  .metric-card:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(240,192,64,0.2);
+  }
+
+  /* ── Header ────────────────────────────────── */
+  .header-glass {
+    background: rgba(5, 13, 26, 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid rgba(240,192,64,0.1);
+  }
+
+  /* ── Input ─────────────────────────────────── */
+  .chat-input {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    color: #e2e8f0;
+    font-family: 'Noto Sans Thai', sans-serif;
+    font-size: 0.875rem;
+    padding: 10px 14px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.6;
+  }
+  .chat-input:focus {
+    border-color: rgba(240,192,64,0.4);
+    box-shadow: 0 0 0 3px rgba(240,192,64,0.08);
+  }
+  .chat-input::placeholder { color: #475569; }
+
+  /* ── Send Button ───────────────────────────── */
+  .send-btn {
+    background: linear-gradient(135deg, var(--gold-400), #d97706);
+    border: none;
+    border-radius: 10px;
+    color: var(--navy-950);
+    cursor: pointer;
+    font-weight: 600;
+    padding: 10px 20px;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-family: 'Noto Sans Thai', sans-serif;
+    font-size: 0.875rem;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .send-btn:hover { transform: scale(1.05); box-shadow: var(--glow-gold); }
+  .send-btn:active { transform: scale(0.97); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* ── Section Label ─────────────────────────── */
+  .section-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #475569;
+    padding: 0 4px;
+  }
+
+  /* ── Floor Divider ─────────────────────────── */
+  .floor-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 4px;
+  }
+  .floor-divider::before,
+  .floor-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(240,192,64,0.2), transparent);
+  }
+
+  /* ── Watchlist Badge ───────────────────────── */
+  .wl-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.2s;
+  }
+  .wl-badge:hover { background: rgba(240,192,64,0.08); border-color: rgba(240,192,64,0.2); }
+
+  /* ── Glass Badge Brand ─────────────────────── */
+  .brand-badge {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    z-index: 100;
+    background: rgba(5,13,26,0.85);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(240,192,64,0.25);
+    border-radius: 100px;
+    padding: 6px 14px;
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Fraunces', serif;
+    font-size: 0.75rem;
+    color: var(--gold-300);
+    animation: badge-float 4s ease-in-out infinite;
+    cursor: default;
+    user-select: none;
+  }
+  @keyframes badge-float {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-4px); }
+  }
+
+  /* ── API Key Setup Modal ───────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal-box {
+    background: var(--navy-800);
+    border: 1px solid rgba(240,192,64,0.2);
+    border-radius: 20px;
+    padding: 32px;
+    width: 100%; max-width: 480px;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+    animation: modal-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes modal-in {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* ── Scrollbar Global ──────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+  /* ── Utility ───────────────────────────────── */
+  .text-gold { color: var(--gold-400); }
+  .text-teal { color: var(--teal-400); }
+  .text-sky  { color: var(--sky-400); }
+  .text-violet { color: var(--violet-400); }
+  .glow-text-gold { text-shadow: 0 0 20px rgba(240,192,64,0.5); }
+
+  .fade-in {
+    animation: fade-in 0.5s ease forwards;
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Responsive Layout ─────────────────────── */
+  .main-layout {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    min-height: calc(100dvh - 64px);
+  }
+
+  .bottom-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    height: 480px;
+  }
+
+  @media (max-width: 1024px) {
+    .bottom-layout {
+      grid-template-columns: 1fr;
+      height: auto;
+    }
+  }
+
+  /* ── Active Agent Header ───────────────────── */
+  .agent-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .agent-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    border: 2px solid var(--room-color, var(--gold-400));
+    box-shadow: 0 0 12px var(--room-color, rgba(240,192,64,0.3));
+    flex-shrink: 0;
+  }
+
+  /* Building lights animation */
+  .bldg-light {
+    animation: blink-light 2s ease-in-out infinite;
+  }
+  .bldg-light:nth-child(odd) { animation-delay: 0.7s; }
+  .bldg-light:nth-child(3n) { animation-delay: 1.4s; }
+
+  @keyframes blink-light {
+    0%, 90%, 100% { opacity: 1; }
+    95% { opacity: 0.3; }
+  }
+
+  /* Ticker tape */
+  .ticker-wrap {
+    overflow: hidden;
+    background: rgba(240,192,64,0.05);
+    border-top: 1px solid rgba(240,192,64,0.1);
+    border-bottom: 1px solid rgba(240,192,64,0.1);
+    padding: 6px 0;
+  }
+  .ticker-inner {
+    display: flex; gap: 48px;
+    animation: ticker 30s linear infinite;
+    white-space: nowrap;
+  }
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  .stock-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: #94a3b8;
+  }
+  .stock-chip .up   { color: var(--emerald-400); }
+  .stock-chip .down { color: var(--rose-400); }
+  .stock-chip .sym  { color: var(--gold-300); font-weight: 500; }
+
+  /* Tab styling */
+  .tab-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    color: #64748b;
+    background: transparent;
+    font-family: 'Noto Sans Thai', sans-serif;
+  }
+  .tab-btn.active {
+    background: rgba(240,192,64,0.12);
+    border-color: rgba(240,192,64,0.3);
+    color: var(--gold-300);
+  }
+  .tab-btn:hover:not(.active) {
+    color: #94a3b8;
+    background: rgba(255,255,255,0.04);
+  }
+</style>
+</head>
+
+<body class="grid-bg">
+
+<!-- ══════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════ -->
+<header class="header-glass sticky top-0 z-50 h-16 flex items-center justify-between px-6" role="banner">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 rounded-lg flex items-center justify-center"
+         style="background: linear-gradient(135deg, var(--gold-400), #d97706);">
+      <span style="font-size:1rem;">🏢</span>
+    </div>
+    <div>
+      <h1 class="font-display text-lg leading-none" style="color: var(--gold-300); letter-spacing:0.02em;">
+        A-VI Command
+      </h1>
+      <p class="text-xs leading-none mt-0.5" style="color:#475569; font-family:'JetBrains Mono',monospace;">
+        Investment Virtual Office
+      </p>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <!-- System Status -->
+    <div class="flex items-center gap-2 px-3 py-1.5 glass-light">
+      <span class="status-dot" id="systemStatus"></span>
+      <span class="text-xs" id="systemStatusText" style="color:#94a3b8;">พร้อมใช้งาน</span>
+    </div>
+
+    <!-- API Key Button -->
+    <button onclick="APP_CORE.showApiModal()"
+            class="flex items-center gap-2 px-3 py-1.5 glass-light text-xs transition-all hover:border-yellow-500/30"
+            style="color:#94a3b8; border-radius:8px;">
+      <i data-lucide="key" class="w-3 h-3"></i>
+      <span>API Key</span>
+    </button>
+
+    <!-- Agent Count -->
+    <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 glass-light">
+      <i data-lucide="users" class="w-3 h-3 text-teal"></i>
+      <span class="text-xs" style="color:#94a3b8;">9 Agents Online</span>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════
+     TICKER TAPE
+══════════════════════════════════════════ -->
+<div class="ticker-wrap" id="tickerWrap">
+  <div class="ticker-inner" id="tickerInner">
+    <!-- filled by JS -->
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════════ -->
+<main class="px-4 py-4 max-w-screen-2xl mx-auto" style="position:relative; z-index:1;">
+
+  <!-- ── OFFICE MAP SECTION ───────────────── -->
+  <section class="mb-4 glass" style="padding: 20px;">
+    <div class="flex items-center justify-between mb-4">
+      <div class="floor-divider flex-1">
+        <span class="section-label text-gold px-2">🏢 A-VI Command — Office Map</span>
+      </div>
+    </div>
+
+    <!-- COMMAND CENTER (row 1 — full width single card) -->
+    <div class="mb-3">
+      <p class="section-label mb-2 px-1" style="color:rgba(240,192,64,0.5);">⚡ Command Center</p>
+      <div class="grid grid-cols-1 gap-3">
+        <div class="room-card room-command" id="room-ph" onclick="APP_CORE.selectAgent('ph')"
+             style="min-height:110px; flex-direction:row; justify-content:flex-start; gap:16px; padding:16px 24px;">
+          <div class="character" style="font-size:3rem;">👩‍💼</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-semibold text-sm text-gold">แพร</span>
+              <span class="status-dot"></span>
+              <span class="text-xs px-2 py-0.5 rounded-full text-gold"
+                    style="background:rgba(240,192,64,0.12); border:1px solid rgba(240,192,64,0.2); font-size:0.6rem; letter-spacing:0.05em;">
+                CHIEF OF STAFF
+              </span>
+            </div>
+            <p class="text-xs" style="color:#64748b; line-height:1.5;">
+              รับคำสั่งจากพี่ A · ส่งงานให้ทีม · ประสานงานทุกฝ่าย · สรุปรายงาน
+            </p>
+            <p class="text-xs mt-1.5 italic" style="color:rgba(240,192,64,0.5);">
+              "สั่งงานที่นี่ก่อน แพรจะส่งให้ถูกคนเองค่ะ"
+            </p>
+          </div>
+          <div class="text-right">
+            <div class="text-xs px-2 py-1 rounded-lg" style="background:rgba(240,192,64,0.08); color:rgba(240,192,64,0.6); font-family:'JetBrains Mono',monospace;">
+              CMD-01
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLOORS GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+      <!-- RESEARCH FLOOR -->
+      <div>
+        <p class="section-label mb-2 px-1" style="color:rgba(56,189,248,0.5);">🔬 Research Floor</p>
+        <div class="flex flex-col gap-3">
+
+          <div class="room-card room-research" id="room-wi" onclick="APP_CORE.selectAgent('wi')">
+            <div class="character">📊</div>
+            <div class="text-center">
+              <div class="flex items-center justify-center gap-2 mb-0.5">
+                <span class="font-semibold text-sm text-sky">วิชัย</span>
+                <span class="status-dot"></span>
+              </div>
+              <p class="text-xs" style="color:#64748b;">VI Analyst</p>
+              <p class="text-xs mt-1" style="color:rgba(56,189,248,0.4); font-size:0.65rem;">
+                งบการเงิน · ROE · P/BV · Moat
+              </p>
+            </div>
+          </div>
+
+          <div class="room-card room-research" id="room-sa" onclick="APP_CORE.selectAgent('sa')">
+            <div class="character">🌏</div>
+            <div class="text-center">
+              <div class="flex items-center justify-center gap-2 mb-0.5">
+                <span class="font-semibold text-sm text-sky">ซาร่า</span>
+                <span class="status-dot"></span>
+              </div>
+              <p class="text-xs" style="color:#64748b;">Global Analyst</p>
+              <p class="text-xs mt-1" style="color:rgba(56,189,248,0.4); font-size:0.65rem;">
+                US Stocks · ETF · กองทุนต่างประเทศ
+              </p>
+            </div>
+          </div>
+
+          <div class="room-card room-research" id="room-ki" onclick="APP_CORE.selectAgent('ki')">
+            <div class="character">📦</div>
+            <div class="text-center">
+              <div class="flex items-center justify-center gap-2 mb-0.5">
+                <span class="font-semibold text-sm text-sky">กิตติ์</span>
+                <span class="status-dot"></span>
+              </div>
+              <p class="text-xs" style="color:#64748b;">Fund & Tax Analyst</p>
+              <p class="text-xs mt-1" style="color:rgba(56,189,248,0.4); font-size:0.65rem;">
+                SSF · RMF · ThaiESG · ภาษี
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- INTELLIGENCE FLOOR -->
+      <div>
+        <p class="section-label mb-2 px-1" style="color:rgba(45,212,191,0.5);">📡 Intelligence Floor</p>
+        <div class="flex flex-col gap-3">
+
+          <div class="room-card room-intel" id="room-mi" onclick="APP_CORE.selectAgent('mi')">
+            <div class="character">💰</div>
+            <div class="text-center">
+              <div class="flex items-center justify-center gap-2 mb-0.5">
+                <span class="font-semibold text-sm text-teal">มินตรา</span>
+                <span class="status-dot"></span>
+              </div>
+              <p class="text-xs" style="color:#64748b;">Dividend Tracker</p>
+              <p class="text-xs mt-1" style="color:rgba(45,212,191,0.4); font-size:0.65rem;">
+                Yield · XD Date · ประวัติปันผล
+              </p>
+            </div>
+          </div>
+
+          <div class="room-card room-intel" id="room-na" onclick="APP_CORE.selectAgent('na')">
+            <div class="character">🔍</div>
+            <div class="text-center">
+              <div class="flex items-center justify-center gap-2 mb-0.5">
+                <span class="font-semibold text-sm text-teal">ณัฐ</span>
+                <span class="status-dot"></span>
+              </div>
+              <p class="text-xs" style="color:#64748b;">Market Scout</p>
+              <p class="text-xs mt-1" style="color:rgba(45,212,191,0.4); font-size:0.65rem;">
+                สแกน SET100 · ข่าว Sector
+              </p>
+            </div>
+          </div>
+
+          <div class="room-card room-intel" id="room-pi" onclick="APP_CORE.selectAgent('pi')">
+            <div class="character">🌐</div>
+            <div class="text-center">
+              <div class="flex items-center justify-center gap-2 mb-0.5">
+                <span class="font-semibold text-sm text-teal">ดร.ปิยะ</span>
+                <span class="status-dot"></span>
+              </div>
+              <p class="text-xs" style="color:#64748b;">Macro Economist</p>
+              <p class="text-xs mt-1" style="color:rgba(45,212,191,0.4); font-size:0.65rem;">
+                Fed · ธปท. · USD/THB · น้ำมัน
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- CONTROL FLOOR -->
+      <div>
+        <p class="section-label mb-2 px-1" style="color:rgba(167,139,250,0.5);">🛡️ Control Floor</p>
+        <div class="flex flex-col gap-3">
+
+          <div class="room-card room-control" id="room-so" onclick="APP_CORE.selectAgent('so')">
+            <div class="character">⚖️</div>
+            <div class="text-center">
+              <div class="flex items-center justify-center gap-2 mb-0.5">
+                <span class="font-semibold text-sm text-violet">สมชาย</span>
+                <span class="status-dot"></span>
+              </div>
+              <p class="text-xs" style="color:#64748b;">Risk Manager</p>
+              <p class="text-xs mt-1" style="color:rgba(167,139,250,0.4); font-size:0.65rem;">
+                Portfolio Weight · Concentration
+              </p>
+            </div>
+          </div>
+
+          <div class="room-card room-control" id="room-wa" onclick="APP_CORE.selectAgent('wa')">
+            <div class="character">🧘</div>
+            <div class="text-center">
+              <div class="flex items-center justify-center gap-2 mb-0.5">
+                <span class="font-semibold text-sm text-violet">อ.วรรณ</span>
+                <span class="status-dot"></span>
+              </div>
+              <p class="text-xs" style="color:#64748b;">Investment Coach</p>
+              <p class="text-xs mt-1" style="color:rgba(167,139,250,0.4); font-size:0.65rem;">
+                VI Mindset · สติการลงทุน
+              </p>
+            </div>
+          </div>
+
+          <!-- Watchlist Mini -->
+          <div class="glass-light p-3" style="border-radius:12px;">
+            <p class="section-label mb-2" style="color:rgba(167,139,250,0.5);">📋 Watchlist</p>
+            <div id="watchlistMini" class="flex flex-wrap gap-1.5">
+              <span class="text-xs" style="color:#475569;">ยังไม่มีหุ้นใน Watchlist</span>
+            </div>
+            <button onclick="APP_CORE.showAddWatchlist()"
+                    class="mt-2 w-full text-xs py-1.5 rounded-lg transition-all"
+                    style="background:rgba(167,139,250,0.08); border:1px dashed rgba(167,139,250,0.2); color:rgba(167,139,250,0.6);">
+              + เพิ่มหุ้น
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DASHBOARD + CHAT ──────────────────── -->
+  <div class="bottom-layout gap-4" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+
+    <!-- LEFT: DASHBOARD -->
+    <section class="glass flex flex-col" style="padding:0; overflow:hidden; min-height:460px;">
+      <div class="flex items-center justify-between px-4 py-3"
+           style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <h2 class="text-sm font-semibold text-gold flex items-center gap-2">
+          <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+          Dashboard
+        </h2>
+        <div class="flex gap-1">
+          <button class="tab-btn active" onclick="APP_CORE.switchTab('overview', this)">ภาพรวม</button>
+          <button class="tab-btn" onclick="APP_CORE.switchTab('dividend', this)">ปันผล</button>
+          <button class="tab-btn" onclick="APP_CORE.switchTab('watchlist', this)">Watchlist</button>
+        </div>
+      </div>
+
+      <!-- Tab: Overview -->
+      <div id="tab-overview" class="flex-1 p-4 overflow-y-auto">
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="metric-card">
+            <p class="text-xs mb-1" style="color:#475569;">SET Index</p>
+            <p class="font-mono font-medium" style="color:var(--gold-300); font-size:1.1rem;" id="setIndex">—</p>
+            <p class="text-xs mt-0.5" id="setChange" style="color:#475569;">กำลังโหลด...</p>
+          </div>
+          <div class="metric-card">
+            <p class="text-xs mb-1" style="color:#475569;">USD/THB</p>
+            <p class="font-mono font-medium" style="color:var(--teal-400); font-size:1.1rem;" id="usdthb">—</p>
+            <p class="text-xs mt-0.5" style="color:#475569;" id="usdthbNote">อ้างอิง BOT</p>
+          </div>
+          <div class="metric-card">
+            <p class="text-xs mb-1" style="color:#475569;">พอร์ตของฉัน</p>
+            <p class="font-mono font-medium" style="color:var(--emerald-400); font-size:1.1rem;">฿0</p>
+            <p class="text-xs mt-0.5" style="color:#475569;">เริ่มต้นพอร์ต Phase 4</p>
+          </div>
+          <div class="metric-card">
+            <p class="text-xs mb-1" style="color:#475569;">Watchlist</p>
+            <p class="font-mono font-medium" style="color:var(--violet-400); font-size:1.1rem;" id="wlCount">0 หุ้น</p>
+            <p class="text-xs mt-0.5" style="color:#475569;">กำลังจับตาดู</p>
+          </div>
+        </div>
+
+        <!-- Chart placeholder -->
+        <div class="metric-card" style="padding:16px;">
+          <p class="text-xs mb-3 text-gold flex items-center gap-2">
+            <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+            SET Index — 6 เดือนล่าสุด (ตัวอย่าง)
+          </p>
+          <canvas id="setChart" style="max-height:120px;"></canvas>
+        </div>
+
+        <div class="mt-3 p-3 rounded-xl text-xs" style="background:rgba(240,192,64,0.05); border:1px solid rgba(240,192,64,0.1); color:#64748b; line-height:1.7;">
+          <span class="text-gold font-medium">💡 Phase 3</span> — ราคาหุ้น Real-time, Dividend Calendar และข้อมูลอัตโนมัติจาก Yahoo Finance จะเปิดใช้งานในขั้นตอนถัดไปค่ะ
+        </div>
+      </div>
+
+      <!-- Tab: Dividend -->
+      <div id="tab-dividend" class="flex-1 p-4 overflow-y-auto hidden">
+        <div class="space-y-2" id="dividendList">
+          <div class="p-3 rounded-xl text-center" style="background:rgba(255,255,255,0.02); border:1px dashed rgba(255,255,255,0.06);">
+            <span class="text-4xl mb-2 block">💰</span>
+            <p class="text-sm" style="color:#64748b;">เพิ่มหุ้นใน Watchlist</p>
+            <p class="text-xs mt-1" style="color:#475569;">เพื่อติดตาม XD Date และ Dividend Yield</p>
+          </div>
+          <!-- Sample upcoming dividend -->
+          <div class="metric-card flex items-center justify-between">
+            <div>
+              <p class="text-xs font-mono text-gold">PTT</p>
+              <p class="text-xs" style="color:#64748b;">ปิโตรเลียมไทย</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs" style="color:var(--emerald-400);">Yield ~5.2%</p>
+              <p class="text-xs" style="color:#475569; font-family:'JetBrains Mono',monospace;">XD: —</p>
+            </div>
+          </div>
+          <div class="metric-card flex items-center justify-between">
+            <div>
+              <p class="text-xs font-mono text-gold">PTTEP</p>
+              <p class="text-xs" style="color:#64748b;">สำรวจปิโตรเลียม</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs" style="color:var(--emerald-400);">Yield ~4.8%</p>
+              <p class="text-xs" style="color:#475569; font-family:'JetBrains Mono',monospace;">XD: —</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Watchlist -->
+      <div id="tab-watchlist" class="flex-1 p-4 overflow-y-auto hidden">
+        <div id="watchlistFull" class="space-y-2">
+          <div class="text-center py-6">
+            <span class="text-3xl block mb-2">🔍</span>
+            <p class="text-sm" style="color:#64748b;">ยังไม่มีหุ้นใน Watchlist</p>
+            <button onclick="APP_CORE.showAddWatchlist()"
+                    class="mt-3 px-4 py-2 rounded-lg text-xs text-gold transition-all"
+                    style="background:rgba(240,192,64,0.08); border:1px solid rgba(240,192,64,0.2);">
+              + เพิ่มหุ้นตัวแรก
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: CHAT PANEL -->
+    <section class="glass flex flex-col" style="padding:0; overflow:hidden; min-height:460px;">
+      <!-- Agent Header -->
+      <div class="agent-header" id="agentHeader">
+        <div class="agent-avatar" id="agentAvatar" style="--room-color: var(--gold-400);">👩‍💼</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-gold truncate" id="agentName">แพร</p>
+          <p class="text-xs truncate" style="color:#64748b;" id="agentRole">Chief of Staff — รอรับคำสั่งจากพี่ A</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="status-dot" id="agentStatusDot"></span>
+          <button onclick="APP_CORE.clearChat()" title="ล้างประวัติ"
+                  class="p-1.5 rounded-lg transition-all hover:bg-white/5" style="color:#475569;">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div class="chat-messages flex-1" id="chatMessages">
+        <!-- Welcome message filled by JS -->
+      </div>
+
+      <!-- Input Area -->
+      <div style="padding:12px; border-top:1px solid rgba(255,255,255,0.06); background:rgba(0,0,0,0.2);">
+        <div class="flex gap-2 items-end">
+          <textarea
+            id="chatInput"
+            class="chat-input flex-1"
+            rows="2"
+            placeholder="ถามแพรได้เลยค่ะ หรือคลิกห้องเพื่อคุยกับ Agent โดยตรง..."
+            onkeydown="APP_CORE.handleInputKey(event)"
+          ></textarea>
+          <button class="send-btn" id="sendBtn" onclick="APP_CORE.sendMessage()">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span>ส่ง</span>
+          </button>
+        </div>
+        <p class="text-xs mt-1.5 text-center" style="color:#334155; font-family:'JetBrains Mono',monospace;">
+          Shift+Enter = บรรทัดใหม่ · Enter = ส่ง
+        </p>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ══════════════════════════════════════════
+     API KEY MODAL
+══════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="apiModal">
+  <div class="modal-box">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+           style="background:rgba(240,192,64,0.15); border:1px solid rgba(240,192,64,0.3);">🔑</div>
+      <div>
+        <h2 class="font-display text-lg text-gold">ตั้งค่า Claude API Key</h2>
+        <p class="text-xs" style="color:#475569;">เพื่อเปิดใช้งาน AI Agents ทั้ง 9 คน</p>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs font-medium mb-1.5 block" style="color:#94a3b8;">Anthropic API Key</label>
+        <input type="password" id="apiKeyInput"
+               placeholder="sk-ant-api03-..."
+               class="w-full px-4 py-3 rounded-xl text-sm"
+               style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#e2e8f0; outline:none; font-family:'JetBrains Mono',monospace;"
+               oninput="this.style.borderColor='rgba(240,192,64,0.3)'"/>
+        <p class="text-xs mt-1.5" style="color:#475569;">
+          Key จะถูกเข้ารหัสและเก็บใน Browser ของคุณเท่านั้น ไม่มีการส่งออกไปไหน
+        </p>
+      </div>
+
+      <div class="p-3 rounded-xl text-xs" style="background:rgba(45,212,191,0.05); border:1px solid rgba(45,212,191,0.15); color:#475569; line-height:1.7;">
+        📍 รับ API Key ได้ที่ <span style="color:var(--teal-400);">console.anthropic.com</span><br/>
+        💡 ใช้ Claude claude-sonnet-4-20250514 · ราคาประหยัดและฉลาดมากค่ะ
+      </div>
+
+      <div class="flex gap-3">
+        <button onclick="APP_CORE.saveApiKey()"
+                class="send-btn flex-1 justify-center py-3">
+          <i data-lucide="save" class="w-4 h-4"></i>
+          บันทึก API Key
+        </button>
+        <button onclick="APP_CORE.hideApiModal()"
+                class="px-4 py-3 rounded-xl text-sm transition-all"
+                style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#64748b;">
+          ยกเลิก
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ADD WATCHLIST MODAL
+══════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="watchlistModal">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+           style="background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.3);">📋</div>
+      <div>
+        <h2 class="font-display text-lg" style="color:var(--violet-400);">เพิ่มหุ้น Watchlist</h2>
+        <p class="text-xs" style="color:#475569;">ติดตามหุ้นที่สนใจ</p>
+      </div>
+    </div>
+    <div class="space-y-3">
+      <input type="text" id="wlSymbol" placeholder="ชื่อย่อหุ้น เช่น PTT, PTTEP, SCB"
+             class="w-full px-4 py-3 rounded-xl text-sm"
+             style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#e2e8f0; outline:none; text-transform:uppercase;"
+             oninput="this.value=this.value.toUpperCase(); this.style.borderColor='rgba(167,139,250,0.3)'"/>
+      <input type="text" id="wlName" placeholder="ชื่อบริษัท (ไม่บังคับ)"
+             class="w-full px-4 py-3 rounded-xl text-sm"
+             style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#e2e8f0; outline:none;"/>
+      <input type="text" id="wlNote" placeholder="โน้ต เช่น รอราคา 12 บาท"
+             class="w-full px-4 py-3 rounded-xl text-sm"
+             style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#e2e8f0; outline:none;"/>
+      <div class="flex gap-3">
+        <button onclick="APP_CORE.addToWatchlist()"
+                class="flex-1 py-3 rounded-xl text-sm font-semibold transition-all"
+                style="background:linear-gradient(135deg,rgba(167,139,250,0.3),rgba(167,139,250,0.15)); border:1px solid rgba(167,139,250,0.4); color:var(--violet-400);">
+          + เพิ่ม
+        </button>
+        <button onclick="APP_CORE.hideWatchlistModal()"
+                class="px-4 py-3 rounded-xl text-sm transition-all"
+                style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#64748b;">
+          ยกเลิก
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TOAST
+══════════════════════════════════════════ -->
+<div id="toastContainer" style="position:fixed; top:80px; right:24px; z-index:300; display:flex; flex-direction:column; gap:8px; pointer-events:none;"></div>
+
+<!-- ══════════════════════════════════════════
+     BRAND BADGE
+══════════════════════════════════════════ -->
+<div class="brand-badge" title="A-VI Command v1.0">
+  <span class="status-dot"></span>
+  <span>Supasit.A</span>
+  <span style="color:#475569; font-size:0.65rem; font-family:'JetBrains Mono',monospace;">v1.0</span>
+</div>
+
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════
+   ① APP_CONFIG
+═══════════════════════════════════════════ */
+const APP_CONFIG = (() => {
+  const DB_VERSION = 1;
+  const DB_NAME    = 'aviCommand';
+
+  const AGENTS = {
+    ph: {
+      id: 'ph', name: 'แพร', role: 'Chief of Staff',
+      emoji: '👩‍💼', floor: 'command', color: 'var(--gold-400)',
+      colorClass: 'text-gold',
+      systemPrompt: `คุณคือ "แพร" Chief of Staff ของ A-VI Command
+สไตล์: มืออาชีพ เป็นมิตร ภาษาไทย พูดสุภาพ ลงท้ายว่า "ค่ะ"
+บทบาท: รับคำถามจากพี่ A แล้ววิเคราะห์ว่าควรส่งให้ทีมไหน
+ทีมงาน: วิชัย(VI หุ้นไทย), ซาร่า(Global/ETF), กิตติ์(กองทุน+ภาษี), มินตรา(ปันผล), ณัฐ(สแกนตลาด), ดร.ปิยะ(Macro), สมชาย(Risk), อ.วรรณ(Mindset)
+เมื่อได้รับคำถาม ให้ตอบพร้อมแนะนำว่า "ควรถามทีมไหนต่อ" สำหรับข้อมูลเพิ่มเติม
+แนวการลงทุน: Value Investing ระยะยาว เน้นปันผล หุ้น SET100 เป็นหลัก เป้าหมายรายได้หลังเกษียณ`
+    },
+    wi: {
+      id: 'wi', name: 'วิชัย', role: 'VI Analyst',
+      emoji: '📊', floor: 'research', color: 'var(--sky-400)',
+      colorClass: 'text-sky',
+      systemPrompt: `คุณคือ "วิชัย" VI Analyst ของ A-VI Command
+สไตล์: จริงจัง เน้นข้อมูล ภาษาไทย ใช้ตัวเลขประกอบ
+ความเชี่ยวชาญ: วิเคราะห์งบการเงินหุ้นไทย ROE ROA D/E P/E P/BV หา Moat ประเมิน Intrinsic Value แบบ DCF
+แนวทาง: Value Investing สไตล์ Buffett/Graham ซื้อตอนราคาต่ำกว่ามูลค่าแท้จริง Margin of Safety ≥ 30%
+Universe: SET100 เป็นหลัก เน้นธุรกิจที่เข้าใจง่าย Moat แข็งแกร่ง งบสะอาด
+เมื่อวิเคราะห์หุ้น ให้สรุป: ✅ จุดแข็ง | ❌ จุดอ่อน | 📊 ตัวเลขสำคัญ | 💡 สรุปคำแนะนำ`
+    },
+    sa: {
+      id: 'sa', name: 'ซาร่า', role: 'Global Analyst',
+      emoji: '🌏', floor: 'research', color: 'var(--sky-400)',
+      colorClass: 'text-sky',
+      systemPrompt: `คุณคือ "ซาร่า" Global Analyst ของ A-VI Command
+สไตล์: คล่องแคล่ว มีความรู้รอบด้าน ภาษาไทย เข้าใจง่าย
+ความเชี่ยวชาญ: หุ้น US (NYSE/NASDAQ), ETF ทั่วโลก, กองทุนต่างประเทศ, ADR
+โฟกัส: หุ้นปันผลต่างประเทศ (SCHD/VYM/DVY), Global VI plays, Sector ETF
+เมื่อแนะนำ ETF หรือกองทุน ให้ระบุ: Expense Ratio, Dividend Yield, ความเสี่ยง, วิธีซื้อในไทย`
+    },
+    ki: {
+      id: 'ki', name: 'กิตติ์', role: 'Fund & Tax Analyst',
+      emoji: '📦', floor: 'research', color: 'var(--sky-400)',
+      colorClass: 'text-sky',
+      systemPrompt: `คุณคือ "กิตติ์" Fund & Tax Analyst ของ A-VI Command
+สไตล์: รอบคอบ ละเอียด ภาษาไทย เน้นประหยัดภาษีอย่างถูกกฎหมาย
+ความเชี่ยวชาญ: กองทุน SSF RMF ThaiESG LTF(เก่า), การลดหย่อนภาษีเงินได้, ภาษีเงินปันผล, Capital Gain Tax
+เมื่อแนะนำ ให้ระบุ: วงเงินลดหย่อน, เงื่อนไขการถือ, กองทุนแนะนำในแต่ละประเภท, ประหยัดภาษีได้กี่บาท`
+    },
+    mi: {
+      id: 'mi', name: 'มินตรา', role: 'Dividend Tracker',
+      emoji: '💰', floor: 'intel', color: 'var(--teal-400)',
+      colorClass: 'text-teal',
+      systemPrompt: `คุณคือ "มินตรา" Dividend Tracker ของ A-VI Command
+สไตล์: กระตือรือร้น ชอบตัวเลขปันผล ภาษาไทย สดใส
+ความเชี่ยวชาญ: ประวัติปันผลหุ้นไทย Dividend Yield DPS (Dividend Per Share) Growth XD Date วันจ่าย
+เมื่อตอบ ให้แสดง: Yield (%) | DPS ปีล่าสุด | ประวัติย้อนหลัง 3-5 ปี | วันที่ XD | ความสม่ำเสมอ
+โฟกัส: หุ้นปันผลสม่ำเสมอ ไม่ตัดปันผล Yield สูงแต่ยั่งยืน`
+    },
+    na: {
+      id: 'na', name: 'ณัฐ', role: 'Market Scout',
+      emoji: '🔍', floor: 'intel', color: 'var(--teal-400)',
+      colorClass: 'text-teal',
+      systemPrompt: `คุณคือ "ณัฐ" Market Scout ของ A-VI Command
+สไตล์: ตื่นตัว ช่างสังเกต ภาษาไทย รายงานกระชับ
+ความเชี่ยวชาญ: สแกนหาหุ้น SET100 ที่น่าสนใจ ข่าว Sector ภาพรวมตลาด
+เมื่อรายงาน ให้ระบุ: หุ้นที่น่าสนใจ | เหตุผล | Catalyst | ความเสี่ยง
+โฟกัส: หุ้นราคาต่ำกว่ามูลค่า (Undervalued) หุ้นที่ถูก Oversell โดยไม่มีเหตุผล`
+    },
+    pi: {
+      id: 'pi', name: 'ดร.ปิยะ', role: 'Macro Economist',
+      emoji: '🌐', floor: 'intel', color: 'var(--teal-400)',
+      colorClass: 'text-teal',
+      systemPrompt: `คุณคือ "ดร.ปิยะ" Macro Economist ของ A-VI Command
+สไตล์: วิชาการ แต่อธิบายเข้าใจง่าย ภาษาไทย
+ความเชี่ยวชาญ: Fed Policy, ธปท., อัตราดอกเบี้ย, เงินเฟ้อ, USD/THB, ราคาน้ำมัน, ภาวะเศรษฐกิจโลก
+เมื่อวิเคราะห์ ให้ตอบ: สถานการณ์ปัจจุบัน | ผลกระทบต่อหุ้นไทย | ผลต่อพอร์ต VI ระยะยาว | แนวโน้ม
+โฟกัส: Macro ไม่ใช่ Short-term trading แต่เป็น Environment ที่ VI ต้องเข้าใจ`
+    },
+    so: {
+      id: 'so', name: 'สมชาย', role: 'Risk Manager',
+      emoji: '⚖️', floor: 'control', color: 'var(--violet-400)',
+      colorClass: 'text-violet',
+      systemPrompt: `คุณคือ "สมชาย" Risk Manager ของ A-VI Command
+สไตล์: รอบคอบ ระมัดระวัง ภาษาไทย พูดตรง
+ความเชี่ยวชาญ: Portfolio Allocation, Concentration Risk, Position Sizing, Rebalancing
+เมื่อประเมิน ให้ตอบ: ความเสี่ยงที่มองเห็น | สัดส่วนที่เหมาะสม | คำแนะนำ Rebalance | Red Flags
+หลักการ: กระจายความเสี่ยง ไม่ Over-concentrate ใน Sector เดียว Margin of Safety เสมอ`
+    },
+    wa: {
+      id: 'wa', name: 'อ.วรรณ', role: 'Investment Coach',
+      emoji: '🧘', floor: 'control', color: 'var(--violet-400)',
+      colorClass: 'text-violet',
+      systemPrompt: `คุณคือ "อาจารย์วรรณ" Investment Coach ของ A-VI Command
+สไตล์: สงบ ใจเย็น ปราชญ์ชาวนาสไตล์ VI ภาษาไทย
+ความเชี่ยวชาญ: จิตวิทยาการลงทุน VI Mindset การรับมือตลาดผันผวน Behavioral Finance
+คำสอน: ซื้อธุรกิจ ไม่ใช่ซื้อราคา | Mr. Market เป็นคนบ้า | Time in Market > Timing the Market
+เมื่อตลาดร่วง: เตือนสติ ให้กลับมาดูพื้นฐาน อย่า Panic Sell | เมื่อตลาดขึ้น: เตือน Greed`
+    }
+  };
+
+  const TICKER_DATA = [
+    { sym: 'PTT', price: '34.25', chg: '+0.50', pct: '+1.48%', up: true },
+    { sym: 'PTTEP', price: '128.00', chg: '-1.00', pct: '-0.78%', up: false },
+    { sym: 'SCB', price: '108.50', chg: '+1.50', pct: '+1.40%', up: true },
+    { sym: 'KBANK', price: '142.00', chg: '-2.00', pct: '-1.39%', up: false },
+    { sym: 'BBL', price: '162.50', chg: '+0.50', pct: '+0.31%', up: true },
+    { sym: 'CPALL', price: '56.75', chg: '+0.25', pct: '+0.44%', up: true },
+    { sym: 'AOT', price: '64.25', chg: '-0.75', pct: '-1.15%', up: false },
+    { sym: 'BEM', price: '9.85', chg: '+0.05', pct: '+0.51%', up: true },
+    { sym: 'MINT', price: '31.50', chg: '+0.50', pct: '+1.61%', up: true },
+    { sym: 'GPSC', price: '42.25', chg: '-0.25', pct: '-0.59%', up: false },
+    { sym: 'OR', price: '19.40', chg: '+0.20', pct: '+1.04%', up: true },
+    { sym: 'ADVANC', price: '215.00', chg: '+3.00', pct: '+1.42%', up: true },
+  ];
+
+  const SET_CHART_DATA = {
+    labels: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.'],
+    data:   [1420, 1385, 1340, 1310, 1290, 1265]
+  };
+
+  return {
+    DB_VERSION, DB_NAME, AGENTS, TICKER_DATA, SET_CHART_DATA,
+    CLAUDE_MODEL: 'claude-sonnet-4-20250514',
+    MAX_TOKENS: 1500,
+  };
+})();
+
+/* ═══════════════════════════════════════════
+   ② STATE_STORE
+═══════════════════════════════════════════ */
+const STATE_STORE = (() => {
+  'use strict';
+  const _state = {};
+  const _listeners = {};
+
+  return {
+    set(key, value) {
+      _state[key] = value;
+      (_listeners[key] || []).forEach(fn => fn(value));
+    },
+    get(key) { return _state[key]; },
+    on(key, fn) {
+      if (!_listeners[key]) _listeners[key] = [];
+      _listeners[key].push(fn);
+    },
+    off(key, fn) {
+      if (!_listeners[key]) return;
+      _listeners[key] = _listeners[key].filter(f => f !== fn);
+    }
+  };
+})();
+
+/* ═══════════════════════════════════════════
+   ③ STORAGE_ENGINE
+═══════════════════════════════════════════ */
+const STORAGE_ENGINE = (() => {
+  'use strict';
+  let _db = null;
+
+  async function _open() {
+    if (_db) return _db;
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(APP_CONFIG.DB_NAME, APP_CONFIG.DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('chats')) {
+          const cs = db.createObjectStore('chats', { keyPath: 'id' });
+          cs.createIndex('agentId', 'agentId');
+          cs.createIndex('timestamp', 'timestamp');
+        }
+        if (!db.objectStoreNames.contains('watchlist')) {
+          db.createObjectStore('watchlist', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('settings')) {
+          db.createObjectStore('settings', { keyPath: 'id' });
+        }
+      };
+      req.onsuccess  = (e) => { _db = e.target.result; resolve(_db); };
+      req.onerror    = (e) => reject(e.target.error);
+    });
+  }
+
+  async function _tx(storeName, mode, fn) {
+    const db = await _open();
+    return new Promise((resolve, reject) => {
+      const tx    = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
+      const req   = fn(store);
+      if (req) {
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror   = (e) => reject(e.target.error);
+      } else {
+        tx.oncomplete = () => resolve(true);
+        tx.onerror    = (e) => reject(e.target.error);
+      }
+    });
+  }
+
+  return {
+    async put(store, item) {
+      return _tx(store, 'readwrite', s => s.put(item));
+    },
+    async get(store, key) {
+      return _tx(store, 'readonly', s => s.get(key));
+    },
+    async getAll(store) {
+      return _tx(store, 'readonly', s => s.getAll());
+    },
+    async delete(store, key) {
+      return _tx(store, 'readwrite', s => s.delete(key));
+    },
+    async clearStore(store) {
+      return _tx(store, 'readwrite', s => s.clear());
+    }
+  };
+})();
+
+/* ═══════════════════════════════════════════
+   ⑥ CLAUDE_AI_BRIDGE
+═══════════════════════════════════════════ */
+const CLAUDE_AI_BRIDGE = (() => {
+  'use strict';
+  const MAX_RETRIES = 3;
+  const BACKOFF_MS  = [1000, 2000, 4000];
+  let _abortCtrl    = null;
+
+  async function _sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  async function _callApi(agent, messages, attempt = 0) {
+    const apiKey = STATE_STORE.get('apiKey');
+    if (!apiKey) throw new Error('NO_API_KEY');
+
+    _abortCtrl = new AbortController();
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':         'application/json',
+        'x-api-key':            apiKey,
+        'anthropic-version':    '2023-06-01',
+        'anthropic-dangerous-allow-browser': 'true',
+      },
+      signal: _abortCtrl.signal,
+      body: JSON.stringify({
+        model:      APP_CONFIG.CLAUDE_MODEL,
+        max_tokens: APP_CONFIG.MAX_TOKENS,
+        system:     agent.systemPrompt,
+        messages
+      })
+    });
+
+    if (res.status === 429 && attempt < MAX_RETRIES) {
+      await _sleep(BACKOFF_MS[attempt]);
+      return _callApi(agent, messages, attempt + 1);
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.content?.[0]?.text || '';
+  }
+
+  return {
+    async chat(agentId, userMessage, history = []) {
+      const agent = APP_CONFIG.AGENTS[agentId];
+      if (!agent) throw new Error('AGENT_NOT_FOUND');
+
+      const messages = [
+        ...history.map(h => ({ role: h.role, content: h.content })),
+        { role: 'user', content: userMessage }
+      ];
+
+      return _callApi(agent, messages);
+    },
+    abort() {
+      if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
+    }
+  };
+})();
+
+/* ═══════════════════════════════════════════
+   ⑦ UI_RENDERER
+═══════════════════════════════════════════ */
+const UI_RENDERER = (() => {
+  'use strict';
+
+  function _escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function _formatResponse(text) {
+    // Convert markdown-like to HTML safely
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-family:\'JetBrains Mono\',monospace;font-size:0.8em;">$1</code>')
+      .replace(/\n/g, '<br/>');
+  }
+
+  return {
+    appendMessage(role, content, agentId) {
+      const container = document.getElementById('chatMessages');
+      if (!container) return;
+
+      const div = document.createElement('div');
+
+      if (role === 'system') {
+        div.className = 'msg-bubble msg-system';
+        div.textContent = content;
+      } else if (role === 'user') {
+        div.className = 'msg-bubble msg-user';
+        div.innerHTML = `<span style="font-size:0.7rem;color:rgba(240,192,64,0.5);display:block;margin-bottom:3px;">คุณ</span>${_escapeHtml(content).replace(/\n/g,'<br/>')}`;
+      } else {
+        const agent = APP_CONFIG.AGENTS[agentId || 'ph'];
+        div.className = 'msg-bubble msg-agent';
+        div.innerHTML = `
+          <span style="font-size:0.7rem;color:${agent.color.replace('var(--','').replace(')','')};display:block;margin-bottom:3px;opacity:0.7;">
+            ${agent.emoji} ${agent.name}
+          </span>
+          <div style="line-height:1.75;">${_formatResponse(content)}</div>`;
+      }
+
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    },
+
+    showTyping(agentId) {
+      const container = document.getElementById('chatMessages');
+      if (!container) return;
+      const div = document.createElement('div');
+      div.id = 'typingIndicator';
+      div.className = 'msg-bubble msg-agent';
+      div.style.padding = '8px 14px';
+      const agent = APP_CONFIG.AGENTS[agentId || 'ph'];
+      div.innerHTML = `
+        <span style="font-size:0.7rem;color:rgba(240,192,64,0.5);display:block;margin-bottom:2px;">${agent.emoji} ${agent.name} กำลังพิมพ์...</span>
+        <div class="typing-dots"><span></span><span></span><span></span></div>`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    },
+
+    hideTyping() {
+      document.getElementById('typingIndicator')?.remove();
+    },
+
+    toast(message, type = 'success') {
+      const colors = {
+        success: 'rgba(52,211,153,0.15)',
+        error:   'rgba(251,113,133,0.15)',
+        info:    'rgba(56,189,248,0.15)',
+        warning: 'rgba(251,191,36,0.15)',
+      };
+      const borders = {
+        success: 'rgba(52,211,153,0.3)',
+        error:   'rgba(251,113,133,0.3)',
+        info:    'rgba(56,189,248,0.3)',
+        warning: 'rgba(251,191,36,0.3)',
+      };
+      const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+
+      const el = document.createElement('div');
+      el.style.cssText = `
+        background:${colors[type]}; border:1px solid ${borders[type]};
+        backdrop-filter:blur(12px); border-radius:10px;
+        padding:10px 16px; font-size:0.8rem; color:#e2e8f0;
+        box-shadow:0 8px 24px rgba(0,0,0,0.4); pointer-events:auto;
+        animation:msg-in 0.3s cubic-bezier(0.34,1.56,0.64,1);
+        max-width:300px; line-height:1.5;`;
+      el.innerHTML = `${icons[type]} ${_escapeHtml(message)}`;
+
+      const container = document.getElementById('toastContainer');
+      if (container) {
+        container.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = '0';
+          el.style.transition = 'opacity 0.3s';
+          setTimeout(() => el.remove(), 300);
+        }, 3000);
+      }
+    },
+
+    updateAgentHeader(agentId) {
+      const agent = APP_CONFIG.AGENTS[agentId];
+      if (!agent) return;
+
+      const avatarEl = document.getElementById('agentAvatar');
+      const nameEl   = document.getElementById('agentName');
+      const roleEl   = document.getElementById('agentRole');
+
+      if (avatarEl) {
+        avatarEl.textContent = agent.emoji;
+        avatarEl.style.setProperty('--room-color', agent.color);
+      }
+      if (nameEl) {
+        nameEl.textContent = agent.name;
+        nameEl.className = `text-sm font-semibold truncate ${agent.colorClass}`;
+      }
+      if (roleEl) {
+        const roleNames = { command:'ฝ่าย Command', research:'ฝ่าย Research', intel:'ฝ่าย Intelligence', control:'ฝ่าย Control' };
+        roleEl.textContent = `${agent.role} — ${roleNames[agent.floor] || ''}`;
+      }
+    },
+
+    updateWatchlistUI(items) {
+      const mini = document.getElementById('watchlistMini');
+      const full = document.getElementById('watchlistFull');
+      const cnt  = document.getElementById('wlCount');
+
+      if (cnt) cnt.textContent = `${items.length} หุ้น`;
+
+      if (mini) {
+        if (items.length === 0) {
+          mini.innerHTML = '<span class="text-xs" style="color:#475569;">ยังไม่มีหุ้นใน Watchlist</span>';
+        } else {
+          mini.innerHTML = items.map(i =>
+            `<span class="wl-badge">
+               <span style="color:var(--gold-300);font-weight:500;">${i.symbol}</span>
+               <button onclick="APP_CORE.removeFromWatchlist('${i.id}')"
+                       style="color:#475569;font-size:0.65rem;cursor:pointer;padding:0 2px;background:none;border:none;"
+                       title="ลบ">✕</button>
+             </span>`
+          ).join('');
+        }
+      }
+
+      if (full) {
+        if (items.length === 0) {
+          full.innerHTML = `
+            <div class="text-center py-6">
+              <span class="text-3xl block mb-2">🔍</span>
+              <p class="text-sm" style="color:#64748b;">ยังไม่มีหุ้นใน Watchlist</p>
+              <button onclick="APP_CORE.showAddWatchlist()"
+                      class="mt-3 px-4 py-2 rounded-lg text-xs text-gold transition-all"
+                      style="background:rgba(240,192,64,0.08); border:1px solid rgba(240,192,64,0.2);">
+                + เพิ่มหุ้นตัวแรก
+              </button>
+            </div>`;
+        } else {
+          full.innerHTML = items.map(i => `
+            <div class="metric-card flex items-center justify-between">
+              <div>
+                <p class="text-xs font-mono text-gold font-semibold">${i.symbol}</p>
+                <p class="text-xs" style="color:#64748b;">${i.name || '—'}</p>
+                ${i.note ? `<p class="text-xs mt-0.5 italic" style="color:#475569;">📝 ${i.note}</p>` : ''}
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="APP_CORE.askAboutStock('${i.symbol}')"
+                        class="px-2 py-1 rounded-lg text-xs transition-all"
+                        style="background:rgba(240,192,64,0.08); border:1px solid rgba(240,192,64,0.15); color:var(--gold-300);">
+                  วิเคราะห์
+                </button>
+                <button onclick="APP_CORE.removeFromWatchlist('${i.id}')"
+                        class="p-1 rounded-lg transition-all hover:bg-red-500/10"
+                        style="color:#475569;">
+                  <i data-lucide="trash-2" style="width:12px;height:12px;"></i>
+                </button>
+              </div>
+            </div>`).join('');
+          lucide.createIcons();
+        }
+      }
+    },
+
+    initTicker() {
+      const inner = document.getElementById('tickerInner');
+      if (!inner) return;
+      const items = [...APP_CONFIG.TICKER_DATA, ...APP_CONFIG.TICKER_DATA];
+      inner.innerHTML = items.map(s => `
+        <span class="stock-chip">
+          <span class="sym">${s.sym}</span>
+          <span>${s.price}</span>
+          <span class="${s.up ? 'up' : 'down'}">${s.chg} (${s.pct})</span>
+        </span>`).join('');
+    },
+
+    initChart() {
+      const ctx = document.getElementById('setChart');
+      if (!ctx) return;
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: APP_CONFIG.SET_CHART_DATA.labels,
+          datasets: [{
+            data:          APP_CONFIG.SET_CHART_DATA.data,
+            borderColor:   'rgba(240,192,64,0.8)',
+            backgroundColor: (context) => {
+              const chart = context.chart;
+              const { ctx: c, chartArea } = chart;
+              if (!chartArea) return 'transparent';
+              const gradient = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+              gradient.addColorStop(0, 'rgba(240,192,64,0.2)');
+              gradient.addColorStop(1, 'rgba(240,192,64,0.01)');
+              return gradient;
+            },
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointBackgroundColor: 'rgba(240,192,64,0.8)',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 } } },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: '#475569', font: { size: 10 }, callback: v => v.toLocaleString('th-TH') }
+            }
+          }
+        }
+      });
+    }
+  };
+})();
+
+/* ═══════════════════════════════════════════
+   ⑨ APP_CORE
+═══════════════════════════════════════════ */
+const APP_CORE = (() => {
+  'use strict';
+
+  // ─── Private State ──────────────────────
+  let _currentAgentId = 'ph';
+  let _chatHistory    = {};   // { agentId: [{role, content}] }
+  let _isSending      = false;
+  let _watchlist      = [];
+
+  // ─── Init ────────────────────────────────
+  async function init() {
+    try {
+      lucide.createIcons();
+      UI_RENDERER.initTicker();
+      UI_RENDERER.initChart();
+      await _loadSettings();
+      await _loadWatchlist();
+      _renderWelcome();
+      _updateSystemStatus(true);
+    } catch (err) {
+      console.error('APP_CORE.init error:', err);
+    }
+  }
+
+  async function _loadSettings() {
+    try {
+      const s = await STORAGE_ENGINE.get('settings', 'app');
+      if (s?.apiKey) {
+        STATE_STORE.set('apiKey', s.apiKey);
+        _updateSystemStatus(true, 'API Key พร้อม');
+      }
+    } catch (_) {}
+  }
+
+  async function _loadWatchlist() {
+    try {
+      _watchlist = (await STORAGE_ENGINE.getAll('watchlist')) || [];
+      UI_RENDERER.updateWatchlistUI(_watchlist);
+    } catch (_) { _watchlist = []; }
+  }
+
+  function _renderWelcome() {
+    const messages = document.getElementById('chatMessages');
+    if (!messages) return;
+    messages.innerHTML = '';
+
+    UI_RENDERER.appendMessage('system', '🏢 A-VI Command เปิดทำการแล้วค่ะ');
+
+    setTimeout(() => {
+      const apiKey = STATE_STORE.get('apiKey');
+      const welcomeText = apiKey
+        ? `สวัสดีค่ะพี่ A! 👋\n\nแพรพร้อมรับคำสั่งแล้วค่ะ ทีมงานครบ 9 คนออนไลน์อยู่นะคะ\n\n💡 **เริ่มต้นได้เลย** — ลองถามอะไรก็ได้ค่ะ เช่น:\n• "สแกนหาหุ้น SET100 น่าสนใจหน่อย"\n• "PTTEP ปันผลประวัติเป็นยังไง"\n• "Macro ตอนนี้เหมาะซื้อหุ้นไหม"`
+        : `สวัสดีค่ะพี่ A! 👋\n\nแพรคือ Chief of Staff ของ A-VI Command ค่ะ\n\n⚠️ **ยังไม่มี API Key** — กรุณาตั้งค่า Claude API Key ก่อนนะคะ กดปุ่ม **"API Key"** ด้านบนขวาได้เลยค่ะ\n\n🔑 รับ Key ฟรีได้ที่ console.anthropic.com`;
+      UI_RENDERER.appendMessage('agent', welcomeText, 'ph');
+    }, 400);
+  }
+
+  function _updateSystemStatus(online, text) {
+    const dot  = document.getElementById('systemStatus');
+    const label = document.getElementById('systemStatusText');
+    if (dot) dot.className = `status-dot ${online ? '' : 'offline'}`;
+    if (label) label.textContent = text || (online ? 'พร้อมใช้งาน' : 'ออฟไลน์');
+  }
+
+  // ─── Agent Selection ─────────────────────
+  function selectAgent(agentId) {
+    if (!APP_CONFIG.AGENTS[agentId]) return;
+
+    // Update room highlight
+    document.querySelectorAll('.room-card').forEach(el => el.classList.remove('active'));
+    const roomEl = document.getElementById(`room-${agentId}`);
+    if (roomEl) roomEl.classList.add('active');
+
+    _currentAgentId = agentId;
+    UI_RENDERER.updateAgentHeader(agentId);
+
+    // Load chat history for this agent
+    const history = _chatHistory[agentId] || [];
+    const messages = document.getElementById('chatMessages');
+    if (!messages) return;
+    messages.innerHTML = '';
+
+    const agent = APP_CONFIG.AGENTS[agentId];
+    UI_RENDERER.appendMessage('system', `${agent.emoji} เข้าห้อง ${agent.name} — ${agent.role}`);
+
+    if (history.length === 0) {
+      setTimeout(() => {
+        const intros = {
+          ph: `สวัสดีค่ะ! แพรพร้อมประสานงานทีมให้พี่ A ค่ะ 🤝\nถามอะไรมาได้เลย แพรจะหาคนที่ใช่มาตอบให้ค่ะ`,
+          wi: `สวัสดีครับพี่ A! วิชัยพร้อมวิเคราะห์หุ้นแล้วครับ 📊\nบอกชื่อหุ้นมาได้เลย จะดูงบให้ละเอียดครับ`,
+          sa: `Hello พี่ A! ซาร่าพร้อมแล้วค่ะ 🌏\nอยากรู้เรื่องหุ้น US, ETF หรือกองทุนต่างประเทศ ถามได้เลยค่ะ`,
+          ki: `สวัสดีค่ะพี่ A! กิตติ์ดูแลเรื่องกองทุนและภาษีนะคะ 📦\nอยากประหยัดภาษีการลงทุน ปรึกษาได้เลยค่ะ`,
+          mi: `สวัสดีค่ะพี่ A! มินตราตามปันผลมาฝากค่ะ 💰\nถามเรื่อง Yield, XD Date หรือประวัติปันผลได้เลยค่ะ`,
+          na: `สวัสดีครับพี่ A! ณัฐสแกนตลาดอยู่ตลอดครับ 🔍\nอยากรู้ว่าตอนนี้มีหุ้นน่าสนใจอะไร บอกมาได้เลยครับ`,
+          pi: `สวัสดีครับพี่ A! ดร.ปิยะวิเคราะห์ Macro ให้ครับ 🌐\nสถานการณ์เศรษฐกิจโลก Fed, ดอกเบี้ย ถามได้เลยครับ`,
+          so: `สวัสดีครับพี่ A! สมชายดูแลความเสี่ยงพอร์ตครับ ⚖️\nอยากให้ประเมิน Portfolio Weight หรือ Concentration Risk ถามมาได้เลยครับ`,
+          wa: `สวัสดีค่ะพี่ A 🧘\n"ตลาดคือกระจกสะท้อนอารมณ์ระยะสั้น แต่เครื่องชั่งน้ำหนักระยะยาว"\n—Warren Buffett\nมีเรื่องการลงทุนที่กังวลอยู่ไหมคะ?`
+        };
+        UI_RENDERER.appendMessage('agent', intros[agentId] || `สวัสดีครับ/ค่ะ!`, agentId);
+      }, 300);
+    } else {
+      history.forEach(h => UI_RENDERER.appendMessage(h.role, h.content, agentId));
+    }
+
+    // Update placeholder
+    const input = document.getElementById('chatInput');
+    if (input) {
+      input.placeholder = `ถาม${agent.name}ได้เลยค่ะ...`;
+      input.focus();
+    }
+  }
+
+  // ─── Send Message ─────────────────────────
+  async function sendMessage() {
+    if (_isSending) return;
+
+    const input = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    if (!input) return;
+
+    const text = input.value.trim();
+    if (!text) return;
+
+    const apiKey = STATE_STORE.get('apiKey');
+    if (!apiKey) {
+      UI_RENDERER.toast('กรุณาตั้งค่า API Key ก่อนค่ะ', 'warning');
+      showApiModal();
+      return;
+    }
+
+    _isSending = true;
+    if (sendBtn) sendBtn.disabled = true;
+    input.value = '';
+    input.style.height = 'auto';
+
+    UI_RENDERER.appendMessage('user', text);
+
+    if (!_chatHistory[_currentAgentId]) _chatHistory[_currentAgentId] = [];
+    _chatHistory[_currentAgentId].push({ role: 'user', content: text });
+
+    UI_RENDERER.showTyping(_currentAgentId);
+
+    try {
+      const history = _chatHistory[_currentAgentId].slice(-10);
+      const reply = await CLAUDE_AI_BRIDGE.chat(_currentAgentId, text, history.slice(0, -1));
+
+      UI_RENDERER.hideTyping();
+      UI_RENDERER.appendMessage('agent', reply, _currentAgentId);
+
+      _chatHistory[_currentAgentId].push({ role: 'assistant', content: reply });
+
+      // Save to IndexedDB
+      await STORAGE_ENGINE.put('chats', {
+        id: `${_currentAgentId}_${Date.now()}`,
+        agentId: _currentAgentId,
+        role: 'assistant',
+        content: reply,
+        timestamp: Date.now()
+      });
+
+    } catch (err) {
+      UI_RENDERER.hideTyping();
+      const errMsg = err.message === 'NO_API_KEY'
+        ? 'ยังไม่มี API Key ค่ะ กดปุ่ม "API Key" ด้านบนเพื่อตั้งค่าได้เลยนะคะ'
+        : `เกิดข้อผิดพลาด: ${err.message} — กรุณาลองใหม่ค่ะ`;
+      UI_RENDERER.appendMessage('system', `⚠️ ${errMsg}`);
+    } finally {
+      _isSending = false;
+      if (sendBtn) sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  function handleInputKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function clearChat() {
+    _chatHistory[_currentAgentId] = [];
+    const messages = document.getElementById('chatMessages');
+    if (messages) messages.innerHTML = '';
+    UI_RENDERER.appendMessage('system', '🗑️ ล้างประวัติการสนทนาแล้วค่ะ');
+    UI_RENDERER.toast('ล้างแชทแล้วค่ะ', 'info');
+  }
+
+  // ─── Tab Switching ────────────────────────
+  function switchTab(tabName, btn) {
+    ['overview', 'dividend', 'watchlist'].forEach(t => {
+      const el = document.getElementById(`tab-${t}`);
+      if (el) el.classList.toggle('hidden', t !== tabName);
+    });
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+  }
+
+  // ─── API Key Modal ────────────────────────
+  function showApiModal() {
+    const modal = document.getElementById('apiModal');
+    if (modal) modal.classList.remove('hidden');
+    const input = document.getElementById('apiKeyInput');
+    if (input) {
+      const current = STATE_STORE.get('apiKey');
+      if (current) input.value = current;
+      setTimeout(() => input.focus(), 100);
+    }
+  }
+
+  function hideApiModal() {
+    const modal = document.getElementById('apiModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  async function saveApiKey() {
+    const input = document.getElementById('apiKeyInput');
+    if (!input) return;
+    const key = input.value.trim();
+
+    if (!key.startsWith('sk-ant-')) {
+      UI_RENDERER.toast('API Key ไม่ถูกต้อง ควรขึ้นต้นด้วย sk-ant-', 'error');
+      return;
+    }
+
+    try {
+      STATE_STORE.set('apiKey', key);
+      await STORAGE_ENGINE.put('settings', { id: 'app', apiKey: key, updatedAt: Date.now() });
+      hideApiModal();
+      UI_RENDERER.toast('บันทึก API Key เรียบร้อยแล้วค่ะ ✨', 'success');
+      _updateSystemStatus(true, 'API Key พร้อม');
+
+      const messages = document.getElementById('chatMessages');
+      if (messages) messages.innerHTML = '';
+      _renderWelcome();
+    } catch (err) {
+      UI_RENDERER.toast(`บันทึกไม่สำเร็จ: ${err.message}`, 'error');
+    }
+  }
+
+  // ─── Watchlist ────────────────────────────
+  function showAddWatchlist() {
+    const modal = document.getElementById('watchlistModal');
+    if (modal) modal.classList.remove('hidden');
+    const sym = document.getElementById('wlSymbol');
+    if (sym) setTimeout(() => sym.focus(), 100);
+  }
+
+  function hideWatchlistModal() {
+    const modal = document.getElementById('watchlistModal');
+    if (modal) modal.classList.add('hidden');
+    ['wlSymbol', 'wlName', 'wlNote'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.value = ''; el.style.borderColor = ''; }
+    });
+  }
+
+  async function addToWatchlist() {
+    const sym  = document.getElementById('wlSymbol')?.value.trim().toUpperCase();
+    const name = document.getElementById('wlName')?.value.trim();
+    const note = document.getElementById('wlNote')?.value.trim();
+
+    if (!sym) {
+      UI_RENDERER.toast('กรุณากรอกชื่อย่อหุ้นค่ะ', 'warning');
+      return;
+    }
+
+    if (_watchlist.find(w => w.symbol === sym)) {
+      UI_RENDERER.toast(`${sym} มีอยู่ใน Watchlist แล้วค่ะ`, 'warning');
+      return;
+    }
+
+    const item = {
+      id: `wl_${sym}_${Date.now()}`,
+      symbol: sym,
+      name: name || '',
+      note: note || '',
+      addedAt: Date.now()
+    };
+
+    try {
+      await STORAGE_ENGINE.put('watchlist', item);
+      _watchlist.push(item);
+      UI_RENDERER.updateWatchlistUI(_watchlist);
+      hideWatchlistModal();
+      UI_RENDERER.toast(`เพิ่ม ${sym} เข้า Watchlist แล้วค่ะ ✨`, 'success');
+    } catch (err) {
+      UI_RENDERER.toast(`เพิ่มไม่สำเร็จ: ${err.message}`, 'error');
+    }
+  }
+
+  async function removeFromWatchlist(id) {
+    try {
+      await STORAGE_ENGINE.delete('watchlist', id);
+      _watchlist = _watchlist.filter(w => w.id !== id);
+      UI_RENDERER.updateWatchlistUI(_watchlist);
+      UI_RENDERER.toast('ลบออกจาก Watchlist แล้วค่ะ', 'info');
+      lucide.createIcons();
+    } catch (err) {
+      UI_RENDERER.toast(`ลบไม่สำเร็จ: ${err.message}`, 'error');
+    }
+  }
+
+  async function askAboutStock(symbol) {
+    selectAgent('wi');
+    await new Promise(r => setTimeout(r, 300));
+    const input = document.getElementById('chatInput');
+    if (input) {
+      input.value = `วิเคราะห์หุ้น ${symbol} ให้หน่อยครับ แนว VI เน้นปันผลระยะยาว`;
+      sendMessage();
+    }
+  }
+
+  return {
+    init,
+    selectAgent,
+    sendMessage,
+    handleInputKey,
+    clearChat,
+    switchTab,
+    showApiModal,
+    hideApiModal,
+    saveApiKey,
+    showAddWatchlist,
+    hideWatchlistModal,
+    addToWatchlist,
+    removeFromWatchlist,
+    askAboutStock
+  };
+})();
+
+/* ── Bootstrap ───────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  APP_CORE.init();
+
+  // Close modals on overlay click
+  document.getElementById('apiModal')?.addEventListener('click', function(e) {
+    if (e.target === this) APP_CORE.hideApiModal();
+  });
+  document.getElementById('watchlistModal')?.addEventListener('click', function(e) {
+    if (e.target === this) APP_CORE.hideWatchlistModal();
+  });
+
+  // Auto-resize textarea
+  const textarea = document.getElementById('chatInput');
+  if (textarea) {
+    textarea.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+  }
+});
+</script>
+</body>
+</html>
