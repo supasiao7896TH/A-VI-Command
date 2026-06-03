@@ -240,6 +240,16 @@ tailwind.config = {
     scroll-behavior: smooth;
   }
 
+  .chat-fullscreen {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 200;
+    min-height: 100dvh !important;
+    height: 100dvh;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
   .chat-messages::-webkit-scrollbar { width: 4px; }
   .chat-messages::-webkit-scrollbar-track { background: transparent; }
   .chat-messages::-webkit-scrollbar-thumb { background: rgba(240,192,64,0.3); border-radius: 2px; }
@@ -1067,7 +1077,7 @@ tailwind.config = {
     </section>
 
     <!-- RIGHT: CHAT PANEL -->
-    <section class="glass flex flex-col" style="padding:0; overflow:hidden; min-height:460px;">
+    <section class="glass flex flex-col" id="chatPanel" style="padding:0; overflow:hidden; min-height:460px;">
       <!-- Agent Header -->
       <div class="agent-header" id="agentHeader">
         <div class="agent-avatar" id="agentAvatar" style="--room-color: var(--gold-400);">👩‍💼</div>
@@ -1077,6 +1087,10 @@ tailwind.config = {
         </div>
         <div class="flex items-center gap-2">
           <span class="status-dot" id="agentStatusDot"></span>
+          <button onclick="APP_CORE.toggleChatFullscreen()" title="ขยายเต็มจอ" id="chatFsBtn"
+                  class="p-1.5 rounded-lg transition-all hover:bg-white/5" style="color:#475569;">
+            <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+          </button>
           <button onclick="APP_CORE.clearChat()" title="ล้างประวัติ"
                   class="p-1.5 rounded-lg transition-all hover:bg-white/5" style="color:#475569;">
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
@@ -1559,8 +1573,50 @@ const LIVE_DATA_ENGINE = (() => {
     return out;
   }
 
+  // ─── สร้าง Live Context: ตัวเลขจริงให้ AI อ้างอิง (ห้ามเดา) ───
+  async function buildLiveContext(question) {
+    const lines = [];
+
+    // 1) SET Index + ค่าเงิน
+    const [setData, fxData] = await Promise.all([
+      fetchStock('^SET.BK'),
+      fetchStock('USDTHB=X')
+    ]);
+    if (setData && setData.price) {
+      lines.push(`SET Index: ${setData.price.toFixed(2)} (${setData.change >= 0 ? '+' : ''}${setData.changePct.toFixed(2)}%)`);
+    }
+    if (fxData && fxData.price) {
+      lines.push(`USD/THB: ${fxData.price.toFixed(2)} (${fxData.change >= 0 ? '+' : ''}${fxData.change.toFixed(4)})`);
+    }
+
+    // 2) รวบรวม symbol: จาก Watchlist + ที่เอ่ยถึงในคำถาม
+    const wl = (typeof APP_CORE !== 'undefined' && APP_CORE.getWatchlist)
+      ? APP_CORE.getWatchlist() : [];
+    const wlSyms = wl.map(w => w.symbol.toUpperCase());
+
+    const mentioned = (question || '').match(/\b[A-Z]{2,6}\b/g) || [];
+    const STOP = new Set(['SET','USD','THB','AI','VI','ETF','SSF','RMF','LTF','PE','PB','ROE','EPS','DCA','IPO','ATH']);
+    const extra = mentioned
+      .map(t => t.toUpperCase())
+      .filter(t => !STOP.has(t) && !wlSyms.includes(t));
+
+    const allSyms = [...new Set([...wlSyms, ...extra])];
+    if (allSyms.length > 0) {
+      const prices = await fetchMultiple(allSyms.map(s => `${s}.BK`));
+      allSyms.forEach(sym => {
+        const d = prices[`${sym}.BK`];
+        if (d && d.price) {
+          lines.push(`${sym}: ${d.price.toFixed(2)} บาท (${d.change >= 0 ? '+' : ''}${d.changePct.toFixed(2)}%)`);
+        }
+      });
+    }
+
+    if (lines.length === 0) return '';
+    return `[ข้อมูลตลาดจริง ณ ตอนนี้ — ใช้ตัวเลขเหล่านี้เท่านั้น ห้ามเดา/แต่งราคาเอง ถ้าไม่มีข้อมูลให้บอกว่าไม่มีข้อมูลล่าสุด]\n${lines.join('\n')}`;
+  }
+
   async function updateDashboard() {
-    const setData = await fetchStock('^SET');
+    const setData = await fetchStock('^SET.BK');
     if (setData) {
       const setEl = document.getElementById('setIndex');
       const chgEl = document.getElementById('setChange');
@@ -1798,7 +1854,7 @@ const LIVE_DATA_ENGINE = (() => {
   }
 
   return {
-    fetchStock, fetchMultiple, fetchDividend,
+    fetchStock, fetchMultiple, fetchDividend, buildLiveContext,
     updateDashboard, updateWatchlistPrices, updateTicker, updateDividendTab,
     refresh, startAutoRefresh, stopAutoRefresh, setChartInstance,
   };
@@ -2663,7 +2719,9 @@ const APP_CORE = (() => {
 
     try {
       const history = _chatHistory[_currentAgentId].slice(-10);
-      const reply = await CLAUDE_AI_BRIDGE.chat(_currentAgentId, text, history.slice(0, -1));
+      const ctx = await LIVE_DATA_ENGINE.buildLiveContext(text);
+      const msg = ctx ? `${text}\n\n${ctx}` : text;
+      const reply = await CLAUDE_AI_BRIDGE.chat(_currentAgentId, msg, history.slice(0, -1));
 
       UI_RENDERER.hideTyping();
       UI_RENDERER.appendMessage('agent', reply, _currentAgentId);
@@ -2694,20 +2752,11 @@ const APP_CORE = (() => {
 
   // ═══ Phase 5: Orchestration ของแพร ═══
   async function _orchestrateWithPraew(question) {
-    // เตรียม Live Context (ราคาหุ้นใน Watchlist ถ้ามี)
+    // เตรียม Live Context: SET/FX + Watchlist + หุ้นที่เอ่ยถึงในคำถาม
     let liveContext = '';
-    if (_watchlist.length > 0) {
-      try {
-        const syms = _watchlist.map(w => `${w.symbol}.BK`);
-        const prices = await LIVE_DATA_ENGINE.fetchMultiple(syms);
-        const priceLines = Object.entries(prices).map(([s, d]) =>
-          `${s.replace('.BK','')}: ${d.price.toFixed(2)} บาท (${d.change >= 0 ? '+' : ''}${d.changePct.toFixed(2)}%)`
-        );
-        if (priceLines.length > 0) {
-          liveContext = `[ข้อมูลราคาล่าสุดใน Watchlist พี่ A]\n${priceLines.join('\n')}`;
-        }
-      } catch (_) {}
-    }
+    try {
+      liveContext = await LIVE_DATA_ENGINE.buildLiveContext(question);
+    } catch (_) {}
 
     const progressId = UI_RENDERER.showOrchestratorProgress();
 
@@ -3046,6 +3095,23 @@ const APP_CORE = (() => {
     grid.classList.toggle('hidden', aiHidden);
   }
 
+  // ─── Toggle Chat Fullscreen ──────────────
+  function toggleChatFullscreen() {
+    const panel = document.getElementById('chatPanel');
+    const btn   = document.getElementById('chatFsBtn');
+    if (!panel) return;
+    const isFs = panel.classList.toggle('chat-fullscreen');
+    if (btn) {
+      btn.title = isFs ? 'ย่อหน้าจอ' : 'ขยายเต็มจอ';
+      btn.innerHTML = `<i data-lucide="${isFs ? 'minimize-2' : 'maximize-2'}" class="w-3.5 h-3.5"></i>`;
+      if (window.lucide) lucide.createIcons();
+    }
+    const msgs = document.getElementById('chatMessages');
+    if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    const input = document.getElementById('chatInput');
+    if (isFs && input) input.focus();
+  }
+
   return {
     init,
     selectAgent,
@@ -3069,6 +3135,8 @@ const APP_CORE = (() => {
     removePortfolioSymbol,
     askPortfolioRisk,
     askPortfolioStock,
+    toggleChatFullscreen,
+    getWatchlist: () => _watchlist,
   };
 })();
 
@@ -3085,6 +3153,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('portfolioModal')?.addEventListener('click', function(e) {
     if (e.target === this) APP_CORE.hidePortfolioModal();
+  });
+
+  // Esc ออกจากโหมดแชทเต็มจอ
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' &&
+        document.getElementById('chatPanel')?.classList.contains('chat-fullscreen')) {
+      APP_CORE.toggleChatFullscreen();
+    }
   });
 
   // Auto-resize textarea
