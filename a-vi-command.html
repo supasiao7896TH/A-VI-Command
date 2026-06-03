@@ -676,6 +676,16 @@ tailwind.config = {
     .hotspot-tag-role { display: none; }
   }
 
+
+  /* ── Orchestrator spinner ──────────────────── */
+  .orch-spin {
+    display: inline-block;
+    animation: orch-rotate 1.2s linear infinite;
+  }
+  @keyframes orch-rotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
 </style>
 </head>
 
@@ -1857,10 +1867,134 @@ const CLAUDE_AI_BRIDGE = (() => {
 
       return _callApi(agent, messages);
     },
+    // Phase 5: เรียกด้วย custom system prompt (สำหรับ Orchestrator)
+    async rawCall(systemPrompt, userMessage) {
+      return _callApi({ systemPrompt }, [{ role: 'user', content: userMessage }]);
+    },
     abort() {
       if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
     }
   };
+})();
+
+/* ═══════════════════════════════════════════
+   ⑩ ORCHESTRATOR_ENGINE (Phase 5)
+   แพรประสานงาน Agent จริงด้วย Smart Routing
+═══════════════════════════════════════════ */
+const ORCHESTRATOR_ENGINE = (() => {
+  'use strict';
+
+  const MAX_AGENTS = 3;  // จำกัดสูงสุด 3 agents/คำถาม
+
+  // รายชื่อ Agent ให้แพรเลือก (ไม่รวมแพรเอง)
+  function _teamRoster() {
+    return Object.values(APP_CONFIG.AGENTS)
+      .filter(a => a.id !== 'ph')
+      .map(a => `- ${a.id}: ${a.name} (${a.role}) — ${a.systemPrompt.split('\n')[2] || a.role}`)
+      .join('\n');
+  }
+
+  // ─── STEP 1: Routing (แพรวิเคราะห์ว่าต้องใช้ใคร) ───
+  async function _route(question) {
+    const routerPrompt = `คุณคือ "แพร" Chief of Staff ของทีมลงทุน A-VI Command
+หน้าที่: วิเคราะห์คำถามของพี่ A แล้วตัดสินใจว่าต้องเรียกผู้เชี่ยวชาญคนไหนมาช่วยตอบ
+
+ทีมงานที่มี:
+${_teamRoster()}
+
+กฎ:
+- ถ้าเป็นคำถามทักทาย/คุยเล่น/ถามเรื่องทั่วไปที่ไม่ต้องผู้เชี่ยวชาญ → needsTeam: false (แพรตอบเอง)
+- ถ้าเป็นคำถามเฉพาะด้านเดียว → เลือก 1 คน
+- ถ้าซับซ้อนต้องหลายมุม → เลือก 2-3 คน (สูงสุด ${MAX_AGENTS})
+- เลือกเฉพาะคนที่จำเป็นจริงๆ อย่าเรียกเกิน
+
+ตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่น:
+{"needsTeam": true/false, "agents": ["id1","id2"], "reason": "เหตุผลสั้นๆ"}`;
+
+    const raw = await CLAUDE_AI_BRIDGE.rawCall(routerPrompt, question);
+    // parse JSON (เผื่อมี markdown fence)
+    const clean = raw.replace(/```json|```/g, '').trim();
+    try {
+      const parsed = JSON.parse(clean);
+      // จำกัดจำนวน
+      if (parsed.agents && parsed.agents.length > MAX_AGENTS) {
+        parsed.agents = parsed.agents.slice(0, MAX_AGENTS);
+      }
+      // กรองเฉพาะ id ที่มีจริง
+      if (parsed.agents) {
+        parsed.agents = parsed.agents.filter(id => APP_CONFIG.AGENTS[id] && id !== 'ph');
+      }
+      return parsed;
+    } catch (_) {
+      return { needsTeam: false, agents: [], reason: '' };
+    }
+  }
+
+  // ─── STEP 2: Delegation (เรียกทีมแบบขนาน) ───
+  async function _delegate(agentId, question, liveContext) {
+    const agent = APP_CONFIG.AGENTS[agentId];
+    let msg = question;
+    if (liveContext) msg += `\n\n${liveContext}`;
+    try {
+      const reply = await CLAUDE_AI_BRIDGE.chat(agentId, msg, []);
+      return { agentId, name: agent.name, emoji: agent.emoji, role: agent.role, reply, ok: true };
+    } catch (err) {
+      return { agentId, name: agent.name, emoji: agent.emoji, role: agent.role, reply: '', ok: false, error: err.message };
+    }
+  }
+
+  // ─── STEP 3: Synthesis (แพรรวมคำตอบ) ───
+  async function _synthesize(question, teamReplies) {
+    const repliesText = teamReplies
+      .filter(r => r.ok)
+      .map(r => `### ${r.emoji} ${r.name} (${r.role})\n${r.reply}`)
+      .join('\n\n---\n\n');
+
+    const synthPrompt = `คุณคือ "แพร" Chief of Staff ของ A-VI Command
+สไตล์: มืออาชีพ เป็นมิตร ภาษาไทย ลงท้าย "ค่ะ"
+หน้าที่: รวบรวมความเห็นจากทีมผู้เชี่ยวชาญ แล้วสรุปเป็นคำตอบเดียวที่กระชับ ชัดเจน ให้พี่ A
+
+แนวการลงทุนของพี่ A: Value Investing ระยะยาว เน้นปันผล หุ้น SET100 เป้าหมายเกษียณ
+
+หลักการสรุป:
+- เริ่มด้วยบทสรุปสั้นๆ (1-2 ประโยค)
+- ดึงประเด็นสำคัญจากแต่ละผู้เชี่ยวชาญ
+- ถ้ามีความเห็นขัดแย้ง ให้ชี้ให้เห็น
+- ปิดท้ายด้วยข้อเสนอแนะที่นำไปใช้ได้จริง
+- กระชับ ไม่เยิ่นเย้อ`;
+
+    const userMsg = `คำถามของพี่ A: "${question}"\n\nความเห็นจากทีม:\n\n${repliesText}\n\nช่วยสรุปให้พี่ A หน่อยค่ะ`;
+    return CLAUDE_AI_BRIDGE.rawCall(synthPrompt, userMsg);
+  }
+
+  // ─── Main: ประสานงานเต็มรูปแบบ ───
+  async function orchestrate(question, liveContext, onProgress) {
+    // STEP 1
+    if (onProgress) onProgress({ phase: 'routing' });
+    const route = await _route(question);
+
+    // ถ้าไม่ต้องใช้ทีม → แพรตอบเอง
+    if (!route.needsTeam || !route.agents || route.agents.length === 0) {
+      if (onProgress) onProgress({ phase: 'solo' });
+      const soloReply = await CLAUDE_AI_BRIDGE.chat('ph', question, []);
+      return { mode: 'solo', reply: soloReply, team: [] };
+    }
+
+    // STEP 2 - เรียกทีมแบบขนาน
+    if (onProgress) onProgress({ phase: 'delegating', agents: route.agents, reason: route.reason });
+    const teamReplies = await Promise.all(
+      route.agents.map(id => _delegate(id, question, liveContext))
+    );
+
+    if (onProgress) onProgress({ phase: 'synthesizing', team: teamReplies });
+
+    // STEP 3 - สรุป
+    const summary = await _synthesize(question, teamReplies);
+
+    return { mode: 'team', reply: summary, team: teamReplies, reason: route.reason };
+  }
+
+  return { orchestrate };
 })();
 
 /* ═══════════════════════════════════════════
@@ -1929,6 +2063,105 @@ const UI_RENDERER = (() => {
     hideTyping() {
       document.getElementById('typingIndicator')?.remove();
     },
+
+    // ═══ Phase 5: Orchestrator Progress UI ═══
+    showOrchestratorProgress() {
+      const container = document.getElementById('chatMessages');
+      if (!container) return null;
+      const id = `orch_${Date.now()}`;
+      const div = document.createElement('div');
+      div.id = id;
+      div.className = 'msg-bubble msg-agent';
+      div.style.width = '100%';
+      div.style.maxWidth = '95%';
+      div.innerHTML = `
+        <span style="font-size:0.7rem;color:rgba(240,192,64,0.6);display:block;margin-bottom:6px;">
+          👩‍💼 แพร — กำลังประสานงาน
+        </span>
+        <div id="${id}_steps" style="display:flex;flex-direction:column;gap:6px;font-size:0.78rem;">
+          <div style="color:#94a3b8;display:flex;align-items:center;gap:6px;">
+            <span class="orch-spin">⏳</span> กำลังวิเคราะห์คำถาม...
+          </div>
+        </div>`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+      return id;
+    },
+
+    updateOrchestratorProgress(id, p) {
+      if (!id) return;
+      const steps = document.getElementById(`${id}_steps`);
+      if (!steps) return;
+      const container = document.getElementById('chatMessages');
+
+      if (p.phase === 'routing') {
+        steps.innerHTML = `<div style="color:#94a3b8;display:flex;align-items:center;gap:6px;"><span class="orch-spin">⏳</span> แพรกำลังเลือกผู้เชี่ยวชาญ...</div>`;
+      } else if (p.phase === 'solo') {
+        steps.innerHTML = `<div style="color:var(--teal-400);display:flex;align-items:center;gap:6px;">✓ แพรตอบเองค่ะ</div><div style="color:#94a3b8;display:flex;align-items:center;gap:6px;"><span class="orch-spin">⏳</span> กำลังเรียบเรียง...</div>`;
+      } else if (p.phase === 'delegating') {
+        const agentNames = p.agents.map(aid => {
+          const a = APP_CONFIG.AGENTS[aid];
+          return `<div style="color:var(--sky-400);display:flex;align-items:center;gap:6px;margin-left:8px;"><span class="orch-spin">⏳</span> ${a.emoji} ถาม${a.name} (${a.role})</div>`;
+        }).join('');
+        steps.innerHTML = `
+          <div style="color:var(--teal-400);">✓ เลือกทีม: ${p.reason || ''}</div>
+          ${agentNames}`;
+      } else if (p.phase === 'synthesizing') {
+        const done = p.team.map(r => {
+          const icon = r.ok ? '✓' : '✕';
+          const col  = r.ok ? 'var(--emerald-400)' : 'var(--rose-400)';
+          return `<div style="color:${col};display:flex;align-items:center;gap:6px;margin-left:8px;">${icon} ${r.emoji} ${r.name}</div>`;
+        }).join('');
+        steps.innerHTML = `
+          <div style="color:var(--emerald-400);">✓ ทีมตอบครบแล้ว</div>
+          ${done}
+          <div style="color:#94a3b8;display:flex;align-items:center;gap:6px;"><span class="orch-spin">⏳</span> แพรกำลังสรุป...</div>`;
+      }
+      if (container) container.scrollTop = container.scrollHeight;
+    },
+
+    removeOrchestratorProgress(id) {
+      if (id) document.getElementById(id)?.remove();
+    },
+
+    appendOrchestratedReply(result) {
+      const container = document.getElementById('chatMessages');
+      if (!container) return;
+
+      const teamBadges = result.team
+        .filter(r => r.ok)
+        .map(r => `<span style="font-size:0.6rem;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);color:var(--sky-300,#7dd3fc);padding:1px 7px;border-radius:100px;">${r.emoji} ${r.name}</span>`)
+        .join(' ');
+
+      const detailId = `detail_${Date.now()}`;
+      const teamDetails = result.team
+        .filter(r => r.ok)
+        .map(r => `
+          <div style="margin-top:8px;padding:10px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);">
+            <p style="font-size:0.7rem;color:var(--sky-400);margin-bottom:4px;font-weight:600;">${r.emoji} ${r.name} — ${r.role}</p>
+            <div style="font-size:0.8rem;line-height:1.7;color:#cbd5e1;">${_formatResponse(r.reply)}</div>
+          </div>`)
+        .join('');
+
+      const div = document.createElement('div');
+      div.className = 'msg-bubble msg-agent';
+      div.style.maxWidth = '95%';
+      div.innerHTML = `
+        <span style="font-size:0.7rem;color:rgba(240,192,64,0.6);display:block;margin-bottom:4px;">
+          👩‍💼 แพร — สรุปจากทีม
+        </span>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">${teamBadges}</div>
+        <div style="line-height:1.75;">${_formatResponse(result.reply)}</div>
+        <button onclick="(function(b){const d=document.getElementById('${detailId}');const open=d.style.display==='none';d.style.display=open?'block':'none';b.textContent=open?'🔼 ซ่อนรายละเอียดทีม':'🔍 ดูรายละเอียดแต่ละคน';})(this)"
+                style="margin-top:10px;font-size:0.7rem;background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.2);color:var(--gold-300);padding:4px 10px;border-radius:8px;cursor:pointer;">
+          🔍 ดูรายละเอียดแต่ละคน
+        </button>
+        <div id="${detailId}" style="display:none;">${teamDetails}</div>`;
+
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    },
+
 
     toast(message, type = 'success') {
       const colors = {
@@ -2323,7 +2556,7 @@ const APP_CORE = (() => {
     setTimeout(() => {
       const apiKey = STATE_STORE.get('apiKey');
       const welcomeText = apiKey
-        ? `สวัสดีค่ะพี่ A! 👋\n\nแพรพร้อมรับคำสั่งแล้วค่ะ ทีมงานครบ 9 คนออนไลน์อยู่นะคะ\n\n💡 **เริ่มต้นได้เลย** — ลองถามอะไรก็ได้ค่ะ เช่น:\n• "สแกนหาหุ้น SET100 น่าสนใจหน่อย"\n• "PTTEP ปันผลประวัติเป็นยังไง"\n• "Macro ตอนนี้เหมาะซื้อหุ้นไหม"`
+        ? `สวัสดีค่ะพี่ A! 👋\n\nแพรพร้อมประสานงานทีมให้แล้วค่ะ ทีมงาน 8 คนออนไลน์อยู่นะคะ\n\n🤝 **แพรทำงานแบบใหม่แล้ว** — ถามแพรครั้งเดียว แพรจะไปถามผู้เชี่ยวชาญที่เกี่ยวข้องให้เอง แล้วเอาคำตอบมาสรุปให้ค่ะ\n\n💡 **ลองถามได้เลย** เช่น:\n• "PTTEP น่าซื้อไหม" (แพรจะถามวิชัย+มินตรา+ดร.ปิยะให้)\n• "ช่วงนี้ควรปรับพอร์ตไหม"\n• "หุ้นปันผลดีๆ แนะนำหน่อย"`
         : `สวัสดีค่ะพี่ A! 👋\n\nแพรคือ Chief of Staff ของ A-VI Command ค่ะ\n\n⚠️ **ยังไม่มี API Key** — กรุณาตั้งค่า Claude API Key ก่อนนะคะ กดปุ่ม **"API Key"** ด้านบนขวาได้เลยค่ะ\n\n🔑 รับ Key ฟรีได้ที่ console.anthropic.com`;
       UI_RENDERER.appendMessage('agent', welcomeText, 'ph');
     }, 400);
@@ -2365,7 +2598,7 @@ const APP_CORE = (() => {
     if (history.length === 0) {
       setTimeout(() => {
         const intros = {
-          ph: `สวัสดีค่ะ! แพรพร้อมประสานงานทีมให้พี่ A ค่ะ 🤝\nถามอะไรมาได้เลย แพรจะหาคนที่ใช่มาตอบให้ค่ะ`,
+          ph: `สวัสดีค่ะ! แพรเป็น Chief of Staff ค่ะ 🤝\nถามแพรได้เลย — แพรจะประสานงานกับผู้เชี่ยวชาญที่เกี่ยวข้องให้ แล้วสรุปคำตอบมาให้ในครั้งเดียวค่ะ`,
           wi: `สวัสดีครับพี่ A! วิชัยพร้อมวิเคราะห์หุ้นแล้วครับ 📊\nบอกชื่อหุ้นมาได้เลย จะดูงบให้ละเอียดครับ`,
           sa: `Hello พี่ A! ซาร่าพร้อมแล้วค่ะ 🌏\nอยากรู้เรื่องหุ้น US, ETF หรือกองทุนต่างประเทศ ถามได้เลยค่ะ`,
           ki: `สวัสดีค่ะพี่ A! กิตติ์ดูแลเรื่องกองทุนและภาษีนะคะ 📦\nอยากประหยัดภาษีการลงทุน ปรึกษาได้เลยค่ะ`,
@@ -2417,6 +2650,15 @@ const APP_CORE = (() => {
     if (!_chatHistory[_currentAgentId]) _chatHistory[_currentAgentId] = [];
     _chatHistory[_currentAgentId].push({ role: 'user', content: text });
 
+    // ═══ Phase 5: ถ้าคุยกับแพร → Orchestrator ═══
+    if (_currentAgentId === 'ph') {
+      await _orchestrateWithPraew(text);
+      _isSending = false;
+      if (sendBtn) sendBtn.disabled = false;
+      input.focus();
+      return;
+    }
+
     UI_RENDERER.showTyping(_currentAgentId);
 
     try {
@@ -2447,6 +2689,55 @@ const APP_CORE = (() => {
       _isSending = false;
       if (sendBtn) sendBtn.disabled = false;
       input.focus();
+    }
+  }
+
+  // ═══ Phase 5: Orchestration ของแพร ═══
+  async function _orchestrateWithPraew(question) {
+    // เตรียม Live Context (ราคาหุ้นใน Watchlist ถ้ามี)
+    let liveContext = '';
+    if (_watchlist.length > 0) {
+      try {
+        const syms = _watchlist.map(w => `${w.symbol}.BK`);
+        const prices = await LIVE_DATA_ENGINE.fetchMultiple(syms);
+        const priceLines = Object.entries(prices).map(([s, d]) =>
+          `${s.replace('.BK','')}: ${d.price.toFixed(2)} บาท (${d.change >= 0 ? '+' : ''}${d.changePct.toFixed(2)}%)`
+        );
+        if (priceLines.length > 0) {
+          liveContext = `[ข้อมูลราคาล่าสุดใน Watchlist พี่ A]\n${priceLines.join('\n')}`;
+        }
+      } catch (_) {}
+    }
+
+    const progressId = UI_RENDERER.showOrchestratorProgress();
+
+    try {
+      const result = await ORCHESTRATOR_ENGINE.orchestrate(question, liveContext, (p) => {
+        UI_RENDERER.updateOrchestratorProgress(progressId, p);
+      });
+
+      UI_RENDERER.removeOrchestratorProgress(progressId);
+
+      if (result.mode === 'solo') {
+        UI_RENDERER.appendMessage('agent', result.reply, 'ph');
+      } else {
+        // แสดงคำตอบสรุป + รายละเอียดทีม (collapsible)
+        UI_RENDERER.appendOrchestratedReply(result);
+      }
+
+      _chatHistory['ph'].push({ role: 'assistant', content: result.reply });
+
+      await STORAGE_ENGINE.put('chats', {
+        id: `ph_${Date.now()}`, agentId: 'ph', role: 'assistant',
+        content: result.reply, timestamp: Date.now()
+      });
+
+    } catch (err) {
+      UI_RENDERER.removeOrchestratorProgress(progressId);
+      const errMsg = err.message === 'NO_API_KEY'
+        ? 'ยังไม่มี API Key ค่ะ'
+        : `เกิดข้อผิดพลาด: ${err.message} — ลองใหม่นะคะ`;
+      UI_RENDERER.appendMessage('system', `⚠️ ${errMsg}`);
     }
   }
 
