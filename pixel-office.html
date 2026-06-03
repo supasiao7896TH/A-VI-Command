@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>A-VI Pixel Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg-page:    #0b0d12;
+    --bg-card:    #14171f;
+    --bg-raised:  #1b1f29;
+    --gold-400:   #f0c040;
+    --sky-400:    #38bdf8;
+    --teal-400:   #2dd4bf;
+    --violet-400: #a78bfa;
+    --emerald-400:#34d399;
+    --rose-400:   #fb7185;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --r-xl: 20px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: var(--bg-page);
+    color: #e2e8f0;
+    font-family: 'Noto Sans Thai', system-ui, sans-serif;
+    overflow: hidden;
+  }
+  .pixel-font { font-family: 'Press Start 2P', monospace; }
+
+  /* ── Top Bar ───────────────────────────── */
+  #topBar {
+    position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    background: rgba(11,13,18,0.72);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  #topBar .title { display: flex; align-items: center; gap: 10px; }
+  #topBar .logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--gold-400), #c79320);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .btn {
+    min-height: 36px; padding: 0 14px; border-radius: var(--r-md);
+    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+    color: #e2e8f0; font-size: 0.82rem; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: background 120ms, transform 80ms;
+  }
+  .btn:hover  { background: rgba(255,255,255,0.09); }
+  .btn:active { transform: scale(0.97); }
+  .btn-gold {
+    background: rgba(240,192,64,0.12); border-color: rgba(240,192,64,0.3);
+    color: var(--gold-400);
+  }
+  .btn-gold:hover { background: rgba(240,192,64,0.2); }
+
+  /* ── Stage / Canvas ────────────────────── */
+  #stage {
+    position: fixed; inset: 52px 0 0 0;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(circle at 50% 30%, #1a1f2b 0%, #0b0d12 70%);
+  }
+  #office {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    box-shadow: 0 16px 60px rgba(0,0,0,0.5);
+    border-radius: 6px;
+    cursor: pointer;
+    touch-action: none;
+  }
+  #hint {
+    position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    z-index: 30; font-size: 0.72rem; color: #64748b;
+    background: rgba(11,13,18,0.6); padding: 5px 12px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.06); pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ── Chat Drawer ───────────────────────── */
+  #drawerOverlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(0,0,0,0.45); backdrop-filter: blur(2px);
+    opacity: 0; pointer-events: none; transition: opacity 220ms;
+  }
+  #drawerOverlay.open { opacity: 1; pointer-events: auto; }
+  #drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 51;
+    width: min(420px, 92vw);
+    background: var(--bg-card);
+    border-left: 1px solid rgba(255,255,255,0.08);
+    box-shadow: -12px 0 40px rgba(0,0,0,0.4);
+    transform: translateX(100%); transition: transform 260ms cubic-bezier(.16,1,.3,1);
+    display: flex; flex-direction: column;
+  }
+  #drawer.open { transform: translateX(0); }
+  .drawer-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .drawer-avatar {
+    width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+    background: rgba(255,255,255,0.05);
+  }
+  #drawerMessages {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  #drawerMessages::-webkit-scrollbar { width: 5px; }
+  #drawerMessages::-webkit-scrollbar-thumb { background: rgba(240,192,64,0.3); border-radius: 3px; }
+  .bubble {
+    max-width: 88%; padding: 10px 13px; border-radius: 13px;
+    font-size: 0.875rem; line-height: 1.75; word-break: break-word;
+    overflow-wrap: anywhere;
+    animation: pop 0.25s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes pop { from { opacity:0; transform: translateY(8px) scale(.96);} to {opacity:1; transform:none;} }
+  .bubble.user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, rgba(240,192,64,0.25), rgba(240,192,64,0.14));
+    border: 1px solid rgba(240,192,64,0.3); color: #fef3c7;
+  }
+  .bubble.agent {
+    align-self: flex-start;
+    background: var(--bg-raised); border: 1px solid rgba(255,255,255,0.08); color: #e2e8f0;
+  }
+  .bubble.system {
+    align-self: center; font-size: 0.74rem; color: #94a3b8;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px; padding: 6px 12px;
+  }
+  .bubble.agent strong { color: var(--gold-400); font-weight: 500; }
+  .bubble.agent code {
+    background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px;
+    font-family: monospace; font-size: 0.82em;
+  }
+  .drawer-input-wrap {
+    padding: 12px; border-top: 1px solid rgba(255,255,255,0.07);
+    background: rgba(0,0,0,0.2);
+  }
+  #chatInput {
+    width: 100%; resize: none; max-height: 120px;
+    background: var(--bg-raised); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--r-md); padding: 10px 12px; color: #e2e8f0;
+    font-family: inherit; font-size: 0.875rem; line-height: 1.7;
+  }
+  #chatInput:focus { outline: none; border-color: rgba(240,192,64,0.4); }
+  .typing-dots span {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--gold-400); margin-right: 4px; opacity: 0.4;
+    animation: blink 1.2s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,60%,100%{opacity:.3} 30%{opacity:1} }
+
+  /* ── Modal ─────────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 60;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal-card {
+    width: 100%; max-width: 420px; background: var(--bg-card);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: var(--r-xl);
+    padding: 24px; box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  }
+  .input-text {
+    width: 100%; background: var(--bg-raised); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--r-md); padding: 11px 12px; color: #e2e8f0;
+    font-family: monospace; font-size: 0.85rem;
+  }
+  .input-text:focus { outline: none; border-color: rgba(240,192,64,0.4); }
+
+  /* ── Toast ─────────────────────────────── */
+  #toastWrap {
+    position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+    z-index: 80; display: flex; flex-direction: column; gap: 8px; align-items: center;
+    pointer-events: none;
+  }
+  .toast {
+    padding: 9px 16px; border-radius: var(--r-md); font-size: 0.82rem;
+    background: var(--bg-raised); border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3); animation: pop 0.25s ease;
+  }
+  .toast.warning { border-color: rgba(251,191,36,0.4); color: #fcd34d; }
+  .toast.success { border-color: rgba(52,211,153,0.4); color: #6ee7b7; }
+  .toast.error   { border-color: rgba(251,113,133,0.4); color: #fca5a5; }
+
+  /* ── Brand badge ───────────────────────── */
+  .brand-badge {
+    position: fixed; bottom: 16px; right: 16px; z-index: 35;
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px; border-radius: 999px;
+    background: rgba(20,23,31,0.8); border: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.72rem; color: #cbd5e1;
+    animation: floaty 4s ease-in-out infinite;
+  }
+  @keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--emerald-400); box-shadow: 0 0 8px var(--emerald-400);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR ── -->
+<div id="topBar">
+  <div class="title">
+    <div class="logo">🏢</div>
+    <div>
+      <div style="font-size:0.92rem; font-weight:600; color:var(--gold-400);">A-VI Pixel Office</div>
+      <div style="font-size:0.66rem; color:#64748b; letter-spacing:0.04em;">ทีม AI ของพี่ A · คลิกตัวละครเพื่อคุย</div>
+    </div>
+  </div>
+  <div style="display:flex; gap:8px;">
+    <button class="btn" id="setApiBtn" onclick="APP_CORE.showApiModal()">🔑 API Key</button>
+  </div>
+</div>
+
+<!-- ── STAGE ── -->
+<div id="stage">
+  <canvas id="office"></canvas>
+</div>
+<div id="hint">💡 คลิกตัวละครเพื่อเริ่มคุย · ลากเมาส์ดูได้ · ทุกคนใช้ข้อมูลตลาดจริง</div>
+
+<!-- ── CHAT DRAWER ── -->
+<div id="drawerOverlay" onclick="APP_CORE.closeDrawer()"></div>
+<aside id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerName">
+  <div class="drawer-head">
+    <div class="drawer-avatar" id="drawerAvatar">👩‍💼</div>
+    <div style="flex:1; min-width:0;">
+      <div id="drawerName" style="font-weight:600; color:var(--gold-400);">แพร</div>
+      <div id="drawerRole" style="font-size:0.74rem; color:#64748b;">Chief of Staff</div>
+    </div>
+    <button class="btn" onclick="APP_CORE.clearChat()" title="ล้างประวัติ" aria-label="ล้างประวัติ" style="min-height:32px; padding:0 10px;">🗑️</button>
+    <button class="btn" onclick="APP_CORE.closeDrawer()" title="ปิด" aria-label="ปิด" style="min-height:32px; padding:0 10px;">✕</button>
+  </div>
+  <div id="drawerMessages" aria-live="polite"></div>
+  <div class="drawer-input-wrap">
+    <div style="display:flex; gap:8px; align-items:flex-end;">
+      <textarea id="chatInput" rows="2" placeholder="พิมพ์คำถาม แล้วกด Enter..." onkeydown="APP_CORE.handleInputKey(event)"></textarea>
+      <button class="btn btn-gold" id="sendBtn" onclick="APP_CORE.sendMessage()" style="min-height:44px;">ส่ง</button>
+    </div>
+    <div style="font-size:0.66rem; color:#475569; text-align:center; margin-top:6px;">Enter = ส่ง · Shift+Enter = บรรทัดใหม่</div>
+  </div>
+</aside>
+
+<!-- ── API KEY MODAL ── -->
+<div class="modal-overlay hidden" id="apiModal" onclick="if(event.target===this)APP_CORE.hideApiModal()">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="apiTitle">
+    <h2 id="apiTitle" style="font-size:1.05rem; color:var(--gold-400); margin:0 0 4px;">ตั้งค่า Claude API Key</h2>
+    <p style="font-size:0.78rem; color:#94a3b8; margin:0 0 16px;">เก็บไว้ในเครื่องของพี่ A เท่านั้น (IndexedDB) ไม่ส่งไปที่อื่น</p>
+    <label for="apiKeyInput" style="font-size:0.72rem; color:#94a3b8; display:block; margin-bottom:6px;">Anthropic API Key</label>
+    <input type="password" id="apiKeyInput" class="input-text" placeholder="sk-ant-api03-..." autocomplete="off"/>
+    <p style="font-size:0.72rem; color:#64748b; margin:10px 0 18px;">📍 รับ Key ได้ที่ <span style="color:var(--teal-400);">console.anthropic.com</span></p>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-gold" style="flex:1; justify-content:center; min-height:42px;" onclick="APP_CORE.saveApiKey()">บันทึก</button>
+      <button class="btn" style="min-height:42px;" onclick="APP_CORE.hideApiModal()">ยกเลิก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toastWrap" aria-live="polite"></div>
+
+<!-- ── BRAND BADGE ── -->
+<div class="brand-badge" title="A-VI Pixel Office v1.0">
+  <span class="status-dot"></span>
+  <span>Supasit.A</span>
+  <span style="color:#475569; font-size:0.64rem; font-family:monospace;">v1.0</span>
+</div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════
+   ① APP_CONFIG
+═══════════════════════════════════════════ */
+const APP_CONFIG = (() => {
+  const PROXY_URL    = 'https://avi-proxy.supasiao.workers.dev';
+  const CLAUDE_MODEL = 'claude-sonnet-4-5';
+  const MAX_TOKENS   = 1500;
+  const DB_NAME      = 'aviPixel';
+  const DB_VERSION   = 1;
+
+  const COLORS = {
+    gold:   '#f0c040',
+    sky:    '#38bdf8',
+    teal:   '#2dd4bf',
+    violet: '#a78bfa',
+  };
+
+  // ทีม 9 agents — ตรงกับ A-VI Command + ตำแหน่งโต๊ะในออฟฟิศ (logical px)
+  const AGENTS = {
+    ph: { id:'ph', name:'แพร', role:'Chief of Staff', emoji:'👩‍💼', color:COLORS.gold,   home:{x:240,y:78},  zone:'แผนกอำนวยการ',
+      systemPrompt:`คุณคือ "แพร" Chief of Staff ของ A-VI Command
+สไตล์: มืออาชีพ เป็นมิตร ภาษาไทย พูดสุภาพ ลงท้ายว่า "ค่ะ"
+บทบาท: รับคำถามจากพี่ A วิเคราะห์ภาพรวม แล้วแนะนำว่าควรปรึกษาผู้เชี่ยวชาญคนไหนต่อ
+ทีมงาน: วิชัย(VI หุ้นไทย), ซาร่า(Global/ETF), กิตติ์(กองทุน+ภาษี), มินตรา(ปันผล), ณัฐ(สแกนตลาด), ดร.ปิยะ(Macro), สมชาย(Risk), อ.วรรณ(Mindset)
+แนวการลงทุน: Value Investing ระยะยาว เน้นปันผล หุ้น SET100 เป็นหลัก เป้าหมายรายได้หลังเกษียณ` },
+    wi: { id:'wi', name:'วิชัย', role:'VI Analyst', emoji:'📊', color:COLORS.sky, home:{x:96,y:108}, zone:'ฝ่ายวิจัย',
+      systemPrompt:`คุณคือ "วิชัย" VI Analyst ของ A-VI Command
+สไตล์: จริงจัง เน้นข้อมูล ภาษาไทย ใช้ตัวเลขประกอบ
+ความเชี่ยวชาญ: วิเคราะห์งบการเงินหุ้นไทย ROE ROA D/E P/E P/BV หา Moat ประเมิน Intrinsic Value แบบ DCF
+แนวทาง: Value Investing สไตล์ Buffett/Graham ซื้อตอนราคาต่ำกว่ามูลค่าแท้จริง Margin of Safety ≥ 30%
+เมื่อวิเคราะห์หุ้น ให้สรุป: ✅ จุดแข็ง | ❌ จุดอ่อน | 📊 ตัวเลขสำคัญ | 💡 สรุปคำแนะนำ` },
+    sa: { id:'sa', name:'ซาร่า', role:'Global Analyst', emoji:'🌏', color:COLORS.sky, home:{x:96,y:176}, zone:'ฝ่ายวิจัย',
+      systemPrompt:`คุณคือ "ซาร่า" Global Analyst ของ A-VI Command
+สไตล์: คล่องแคล่ว มีความรู้รอบด้าน ภาษาไทย เข้าใจง่าย
+ความเชี่ยวชาญ: หุ้น US (NYSE/NASDAQ), ETF ทั่วโลก, กองทุนต่างประเทศ, ADR
+โฟกัส: หุ้นปันผลต่างประเทศ (SCHD/VYM/DVY), Global VI plays, Sector ETF
+เมื่อแนะนำ ETF/กองทุน ให้ระบุ: Expense Ratio, Dividend Yield, ความเสี่ยง, วิธีซื้อในไทย` },
+    ki: { id:'ki', name:'กิตติ์', role:'Fund & Tax', emoji:'📦', color:COLORS.sky, home:{x:96,y:244}, zone:'ฝ่ายวิจัย',
+      systemPrompt:`คุณคือ "กิตติ์" Fund & Tax Analyst ของ A-VI Command
+สไตล์: รอบคอบ ละเอียด ภาษาไทย เน้นประหยัดภาษีอย่างถูกกฎหมาย
+ความเชี่ยวชาญ: กองทุน SSF RMF ThaiESG LTF(เก่า), การลดหย่อนภาษีเงินได้, ภาษีเงินปันผล, Capital Gain Tax
+เมื่อแนะนำ ให้ระบุ: วงเงินลดหย่อน, เงื่อนไขการถือ, กองทุนแนะนำในแต่ละประเภท, ประหยัดภาษีได้กี่บาท` },
+    mi: { id:'mi', name:'มินตรา', role:'Dividend', emoji:'💰', color:COLORS.teal, home:{x:384,y:108}, zone:'ฝ่ายข้อมูล',
+      systemPrompt:`คุณคือ "มินตรา" Dividend Tracker ของ A-VI Command
+สไตล์: กระตือรือร้น ชอบตัวเลขปันผล ภาษาไทย สดใส
+ความเชี่ยวชาญ: ประวัติปันผลหุ้นไทย Dividend Yield DPS Growth XD Date วันจ่าย
+เมื่อตอบ ให้แสดง: Yield (%) | DPS ปีล่าสุด | ประวัติย้อนหลัง 3-5 ปี | วันที่ XD | ความสม่ำเสมอ
+โฟกัส: หุ้นปันผลสม่ำเสมอ ไม่ตัดปันผล Yield สูงแต่ยั่งยืน` },
+    na: { id:'na', name:'ณัฐ', role:'Market Scout', emoji:'🔍', color:COLORS.teal, home:{x:384,y:176}, zone:'ฝ่ายข้อมูล',
+      systemPrompt:`คุณคือ "ณัฐ" Market Scout ของ A-VI Command
+สไตล์: ตื่นตัว ช่างสังเกต ภาษาไทย รายงานกระชับ
+ความเชี่ยวชาญ: สแกนหาหุ้น SET100 ที่น่าสนใจ ข่าว Sector ภาพรวมตลาด
+เมื่อรายงาน ให้ระบุ: หุ้นที่น่าสนใจ | เหตุผล | Catalyst | ความเสี่ยง
+โฟกัส: หุ้นราคาต่ำกว่ามูลค่า (Undervalued) หุ้นที่ถูก Oversell โดยไม่มีเหตุผล` },
+    pi: { id:'pi', name:'ดร.ปิยะ', role:'Macro', emoji:'🌐', color:COLORS.teal, home:{x:384,y:244}, zone:'ฝ่ายข้อมูล',
+      systemPrompt:`คุณคือ "ดร.ปิยะ" Macro Economist ของ A-VI Command
+สไตล์: วิชาการ แต่อธิบายเข้าใจง่าย ภาษาไทย
+ความเชี่ยวชาญ: Fed Policy, ธปท., อัตราดอกเบี้ย, เงินเฟ้อ, USD/THB, ราคาน้ำมัน, ภาวะเศรษฐกิจโลก
+เมื่อวิเคราะห์ ให้ตอบ: สถานการณ์ปัจจุบัน | ผลกระทบต่อหุ้นไทย | ผลต่อพอร์ต VI ระยะยาว | แนวโน้ม` },
+    so: { id:'so', name:'สมชาย', role:'Risk Manager', emoji:'⚖️', color:COLORS.violet, home:{x:198,y:262}, zone:'ฝ่ายควบคุม',
+      systemPrompt:`คุณคือ "สมชาย" Risk Manager ของ A-VI Command
+สไตล์: รอบคอบ ระมัดระวัง ภาษาไทย พูดตรง
+ความเชี่ยวชาญ: Portfolio Allocation, Concentration Risk, Position Sizing, Rebalancing
+เมื่อประเมิน ให้ตอบ: ความเสี่ยงที่มองเห็น | สัดส่วนที่เหมาะสม | คำแนะนำ Rebalance | Red Flags
+หลักการ: กระจายความเสี่ยง ไม่ Over-concentrate ใน Sector เดียว Margin of Safety เสมอ` },
+    wa: { id:'wa', name:'อ.วรรณ', role:'Coach', emoji:'🧘', color:COLORS.violet, home:{x:288,y:262}, zone:'ฝ่ายควบคุม',
+      systemPrompt:`คุณคือ "อาจารย์วรรณ" Investment Coach ของ A-VI Command
+สไตล์: สงบ ใจเย็น ปราชญ์สไตล์ VI ภาษาไทย
+ความเชี่ยวชาญ: จิตวิทยาการลงทุน VI Mindset การรับมือตลาดผันผวน Behavioral Finance
+เมื่อให้คำแนะนำ ให้เน้น: สติ ความอดทน มองยาว ไม่ตื่นตระหนกตามตลาด` },
+  };
+
+  // ─── ผังออฟฟิศ (logical pixel coordinates) ───
+  const WORLD = { w: 480, h: 320 };
+
+  return { PROXY_URL, CLAUDE_MODEL, MAX_TOKENS, DB_NAME, DB_VERSION, COLORS, AGENTS, WORLD };
+})();
+
+/* ═══════════════════════════════════════════
+   ② STATE_STORE — Reactive Pub/Sub
+═══════════════════════════════════════════ */
+const STATE_STORE = (() => {
+  'use strict';
+  const _state = {};
+  const _subs  = {};
+  return {
+    set(key, val) {
+      _state[key] = val;
+      (_subs[key] || []).forEach(fn => { try { fn(val); } catch (_) {} });
+    },
+    get(key) { return _state[key]; },
+    on(key, fn) { (_subs[key] = _subs[key] || []).push(fn); },
+  };
+})();
+
+/* ═══════════════════════════════════════════
+   ③ STORAGE_ENGINE — IndexedDB
+═══════════════════════════════════════════ */
+const STORAGE_ENGINE = (() => {
+  'use strict';
+  const { DB_NAME, DB_VERSION } = APP_CONFIG;
+  let _dbPromise = null;
+
+  function _open() {
+    if (_dbPromise) return _dbPromise;
+    _dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('settings')) {
+          db.createObjectStore('settings', { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains('chats')) {
+          const cs = db.createObjectStore('chats', { keyPath: 'id' });
+          cs.createIndex('agentId', 'agentId');
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror   = () => reject(req.error);
+    });
+    return _dbPromise;
+  }
+
+  async function _tx(store, mode, fn) {
+    const db = await _open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(store, mode);
+      const rq = fn(tx.objectStore(store));
+      tx.oncomplete = () => resolve(rq ? rq.result : undefined);
+      tx.onerror    = () => reject(tx.error);
+    });
+  }
+
+  return {
+    put(store, item)    { return _tx(store, 'readwrite', s => s.put(item)); },
+    get(store, key)     { return _tx(store, 'readonly',  s => s.get(key)); },
+    getAll(store)       { return _tx(store, 'readonly',  s => s.getAll()); },
+    clear(store)        { return _tx(store, 'readwrite', s => s.clear()); },
+  };
+})();
+
+/* ═══════════════════════════════════════════
+   ④ LIVE_DATA — ดึงราคาจริงจาก proxy (เหมือน A-VI Command)
+═══════════════════════════════════════════ */
+const LIVE_DATA = (() => {
+  'use strict';
+  const { PROXY_URL } = APP_CONFIG;
+  const CACHE_TTL = 10 * 60 * 1000;
+  const _cache = {};
+  const STOP = new Set(['SET','USD','THB','AI','VI','ETF','SSF','RMF','LTF','PE','PB','ROE','EPS','DCA','IPO','ATH','DCF','XD','DPS']);
+
+  async function fetchStock(symbol) {
+    const now = Date.now();
+    if (_cache[symbol] && (now - _cache[symbol].ts) < CACHE_TTL) return _cache[symbol].data;
+    try {
+      const res = await fetch(`${PROXY_URL}/stock?symbol=${encodeURIComponent(symbol)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.error || !data.price) return null;
+      _cache[symbol] = { data, ts: now };
+      return data;
+    } catch (_) { return null; }
+  }
+
+  async function fetchMultiple(symbols) {
+    const results = await Promise.allSettled(symbols.map(fetchStock));
+    const out = {};
+    symbols.forEach((s, i) => {
+      if (results[i].status === 'fulfilled' && results[i].value) out[s] = results[i].value;
+    });
+    return out;
+  }
+
+  // สร้างบริบทตัวเลขจริงให้ AI อ้างอิง (ห้ามเดา)
+  async function buildContext(question) {
+    const lines = [];
+    const [setD, fxD] = await Promise.all([fetchStock('^SET.BK'), fetchStock('USDTHB=X')]);
+    if (setD) lines.push(`SET Index: ${setD.price.toFixed(2)} (${setD.change >= 0 ? '+' : ''}${setD.changePct.toFixed(2)}%)`);
+    if (fxD)  lines.push(`USD/THB: ${fxD.price.toFixed(2)} (${fxD.change >= 0 ? '+' : ''}${fxD.change.toFixed(4)})`);
+
+    const mentioned = (question || '').match(/\b[A-Z]{2,6}\b/g) || [];
+    const syms = [...new Set(mentioned.map(t => t.toUpperCase()).filter(t => !STOP.has(t)))];
+    if (syms.length > 0) {
+      const prices = await fetchMultiple(syms.map(s => `${s}.BK`));
+      syms.forEach(s => {
+        const d = prices[`${s}.BK`];
+        if (d) lines.push(`${s}: ${d.price.toFixed(2)} บาท (${d.change >= 0 ? '+' : ''}${d.changePct.toFixed(2)}%)`);
+      });
+    }
+    if (lines.length === 0) return '';
+    return `[ข้อมูลตลาดจริง ณ ตอนนี้ — ใช้ตัวเลขเหล่านี้เท่านั้น ห้ามเดา/แต่งราคาเอง ถ้าไม่มีข้อมูลให้บอกว่าไม่มีข้อมูลล่าสุด]\n${lines.join('\n')}`;
+  }
+
+  return { fetchStock, fetchMultiple, buildContext };
+})();
+
+/* ═══════════════════════════════════════════
+   ⑤ CLAUDE_BRIDGE — BYOK เรียก proxy (เหมือน A-VI Command)
+═══════════════════════════════════════════ */
+const CLAUDE_BRIDGE = (() => {
+  'use strict';
+  const { PROXY_URL, CLAUDE_MODEL, MAX_TOKENS } = APP_CONFIG;
+  const MAX_RETRIES = 3;
+  const BACKOFF_MS  = [1000, 2000, 4000];
+
+  const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  async function _call(systemPrompt, messages, attempt = 0) {
+    const apiKey = STATE_STORE.get('apiKey');
+    if (!apiKey) throw new Error('NO_API_KEY');
+
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: MAX_TOKENS, system: systemPrompt, messages }),
+    });
+
+    if (res.status === 429 && attempt < MAX_RETRIES) {
+      await _sleep(BACKOFF_MS[attempt]);
+      return _call(systemPrompt, messages, attempt + 1);
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    return data.content?.[0]?.text || '';
+  }
+
+  return {
+    /**
+     * @param {Object} agent - agent config (มี systemPrompt)
+     * @param {string} userMessage - ข้อความผู้ใช้ (ต่อ live context แล้ว)
+     * @param {Array}  history - [{role, content}]
+     * @returns {Promise<string>} คำตอบ
+     */
+    async chat(agent, userMessage, history = []) {
+      const messages = [
+        ...history.map(h => ({ role: h.role, content: h.content })),
+        { role: 'user', content: userMessage },
+      ];
+      return _call(agent.systemPrompt, messages);
+    },
+  };
+})();
+
+/* ═══════════════════════════════════════════
+   ⑥ PIXEL_ENGINE — วาดออฟฟิศ + ตัวละคร (Canvas 2D)
+═══════════════════════════════════════════ */
+const PIXEL_ENGINE = (() => {
+  'use strict';
+  const { WORLD, AGENTS } = APP_CONFIG;
+  const canvas = document.getElementById('office');
+  const ctx    = canvas.getContext('2d');
+
+  let SCALE = 2;
+  let _agents = [];     // runtime sprites
+  let _onPick = null;   // callback(agentId)
+  let _last = 0;
+
+  // ── helpers ──
+  function _shade(hex, pct) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.max(0, Math.min(255, Math.round(r + 255 * pct)));
+    g = Math.max(0, Math.min(255, Math.round(g + 255 * pct)));
+    b = Math.max(0, Math.min(255, Math.round(b + 255 * pct)));
+    return `rgb(${r},${g},${b})`;
+  }
+  function _px(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); }
+
+  // ── init sprites from config ──
+  function _initAgents() {
+    _agents = Object.values(AGENTS).map(a => ({
+      id: a.id, name: a.name, emoji: a.emoji, color: a.color,
+      x: a.home.x, y: a.home.y, home: { ...a.home },
+      tx: a.home.x, ty: a.home.y,      // target
+      moving: false, walkPhase: 0, bob: Math.random() * Math.PI * 2,
+      facing: 1, nextWander: 1500 + Math.random() * 4000,
+      state: 'idle',                    // idle | thinking | done
+      hint: '',                          // emoji indicator above head
+    }));
+  }
+
+  function getAgent(id) { return _agents.find(a => a.id === id); }
+  function setState(id, state, hint = '') {
+    const a = getAgent(id); if (!a) return;
+    a.state = state; a.hint = hint;
+  }
+
+  // ── resize: pixel-perfect integer scale to fit stage ──
+  function resize() {
+    const stage = document.getElementById('stage');
+    const availW = stage.clientWidth  - 24;
+    const availH = stage.clientHeight - 24;
+    SCALE = Math.max(1, Math.floor(Math.min(availW / WORLD.w, availH / WORLD.h)));
+    if (SCALE > 4) SCALE = 4;
+    canvas.width  = WORLD.w * SCALE;
+    canvas.height = WORLD.h * SCALE;
+    canvas.style.width  = (WORLD.w * SCALE) + 'px';
+    canvas.style.height = (WORLD.h * SCALE) + 'px';
+  }
+
+  // ── draw the office room ──
+  function _drawOffice() {
+    const W = WORLD.w, H = WORLD.h;
+    // floor
+    _px(0, 0, W, H, '#2a2f3d');
+    // floor tiles (checker)
+    for (let ty = 0; ty < H; ty += 32) {
+      for (let tx = 0; tx < W; tx += 32) {
+        if (((tx / 32) + (ty / 32)) % 2 === 0) _px(tx, ty, 32, 32, '#2f3548');
+      }
+    }
+    // rug in the middle (meeting area)
+    _px(176, 150, 128, 92, '#3a2f4a');
+    _px(180, 154, 120, 84, '#473a5c');
+    // walls
+    const wall = '#1b1f29', wallTop = '#272c3a';
+    _px(0, 0, W, 16, wallTop);   // top
+    _px(0, 0, 12, H, wall);      // left
+    _px(W - 12, 0, 12, H, wall); // right
+    _px(0, H - 12, W, 12, wall); // bottom
+    // windows on top wall
+    for (let x = 40; x < W - 40; x += 70) {
+      _px(x, 3, 44, 10, '#0e1726');
+      _px(x + 2, 5, 40, 6, '#1e3a5f');
+    }
+    // zone labels
+    ctx.fillStyle = 'rgba(56,189,248,0.5)';  ctx.font = '7px "Noto Sans Thai"'; ctx.textAlign = 'left';
+    ctx.fillText('ฝ่ายวิจัย', 60, 30);
+    ctx.fillStyle = 'rgba(45,212,191,0.5)';
+    ctx.fillText('ฝ่ายข้อมูล', 348, 30);
+    ctx.fillStyle = 'rgba(240,192,64,0.55)'; ctx.textAlign = 'center';
+    ctx.fillText('แผนกอำนวยการ', 240, 44);
+    ctx.fillStyle = 'rgba(167,139,250,0.5)';
+    ctx.fillText('ฝ่ายควบคุม', 243, 300);
+    ctx.textAlign = 'left';
+  }
+
+  // ── desk for an agent (drawn behind character) ──
+  function _drawDesk(a) {
+    const dx = a.home.x, dy = a.home.y - 22;
+    _px(dx - 18, dy, 36, 12, '#3d3326');      // desk top
+    _px(dx - 18, dy + 12, 36, 3, '#2a2118');  // desk edge
+    // monitor
+    _px(dx - 7, dy - 11, 14, 10, '#11151d');
+    _px(dx - 5, dy - 9, 10, 6, _shade(a.color, -0.1));
+    _px(dx - 2, dy + 1, 4, 2, '#11151d');
+  }
+
+  // ── pixel character ──
+  function _drawChar(a, t) {
+    const bobY = Math.sin(a.bob) * 1.2;
+    const x = Math.round(a.x), y = Math.round(a.y + bobY);
+    const c = a.color;
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath(); ctx.ellipse(x, a.y + 9, 9, 3, 0, 0, Math.PI * 2); ctx.fill();
+
+    // legs (walk animation)
+    const legSwing = a.moving ? Math.round(Math.sin(a.walkPhase) * 2) : 0;
+    _px(x - 4, y + 4, 3, 5 + legSwing, '#2b3242');
+    _px(x + 1, y + 4, 3, 5 - legSwing, '#2b3242');
+    // body (shirt = agent color)
+    _px(x - 5, y - 4, 10, 9, c);
+    _px(x - 5, y - 4, 10, 2, _shade(c, 0.15));     // highlight
+    // arms
+    _px(x - 6, y - 3, 2, 6, _shade(c, -0.12));
+    _px(x + 4, y - 3, 2, 6, _shade(c, -0.12));
+    // head (skin)
+    _px(x - 4, y - 12, 8, 8, '#e9c39b');
+    // hair (agent color, darker)
+    _px(x - 4, y - 12, 8, 3, _shade(c, -0.35));
+    _px(x - 4, y - 12, 2, 5, _shade(c, -0.35));
+    _px(x + 2, y - 12, 2, 5, _shade(c, -0.35));
+    // eyes
+    const ex = a.facing >= 0 ? 0 : -1;
+    _px(x - 2 + ex, y - 7, 1, 2, '#1a1a1a');
+    _px(x + 1 + ex, y - 7, 1, 2, '#1a1a1a');
+
+    // name tag
+    ctx.font = '7px "Noto Sans Thai"'; ctx.textAlign = 'center';
+    const tw = ctx.measureText(a.name).width;
+    ctx.fillStyle = 'rgba(11,13,18,0.78)';
+    ctx.fillRect(x - tw / 2 - 3, y - 24, tw + 6, 9);
+    ctx.fillStyle = a.color;
+    ctx.fillText(a.name, x, y - 17);
+
+    // status indicator above head
+    if (a.state === 'thinking') {
+      const d = Math.floor(t / 300) % 4;
+      ctx.fillStyle = '#fff'; ctx.font = '8px "Noto Sans Thai"';
+      ctx.fillText('💭' + '.'.repeat(d), x, y - 27);
+    } else if (a.hint) {
+      ctx.font = '9px "Noto Sans Thai"';
+      ctx.fillText(a.hint, x, y - 27);
+    }
+    ctx.textAlign = 'left';
+  }
+
+  // ── update movement/animation ──
+  function _update(dt, t) {
+    for (const a of _agents) {
+      a.bob += dt * 0.004;
+      // wander logic
+      a.nextWander -= dt;
+      if (!a.moving && a.nextWander <= 0) {
+        const r = 26;
+        a.tx = a.home.x + (Math.random() * 2 - 1) * r;
+        a.ty = a.home.y + (Math.random() * 2 - 1) * (r * 0.6);
+        a.moving = true;
+      }
+      if (a.moving) {
+        const dx = a.tx - a.x, dy = a.ty - a.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 1) {
+          a.moving = false;
+          a.nextWander = 2000 + Math.random() * 5000;
+          // sometimes return home
+          if (Math.random() < 0.5) { a.tx = a.home.x; a.ty = a.home.y; a.moving = true; a.nextWander = 0; }
+        } else {
+          const sp = 0.018 * dt;
+          a.x += (dx / dist) * sp;
+          a.y += (dy / dist) * sp;
+          a.facing = dx >= 0 ? 1 : -1;
+          a.walkPhase += dt * 0.02;
+        }
+      }
+    }
+  }
+
+  // ── main render loop ──
+  function _frame(t) {
+    const dt = Math.min(50, t - _last); _last = t;
+    _update(dt, t);
+
+    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, WORLD.w, WORLD.h);
+
+    _drawOffice();
+    for (const a of _agents) _drawDesk(a);
+    // draw characters sorted by y (depth)
+    [..._agents].sort((p, q) => p.y - q.y).forEach(a => _drawChar(a, t));
+
+    requestAnimationFrame(_frame);
+  }
+
+  // ── click → hit test ──
+  function _hitTest(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const lx = (clientX - rect.left) / SCALE;
+    const ly = (clientY - rect.top)  / SCALE;
+    // nearest agent within box
+    let best = null, bestD = 16;
+    for (const a of _agents) {
+      const dx = Math.abs(lx - a.x), dy = Math.abs(ly - (a.y - 4));
+      if (dx < 9 && dy < 14) {
+        const d = Math.hypot(dx, dy);
+        if (d < bestD) { bestD = d; best = a; }
+      }
+    }
+    return best;
+  }
+
+  function init(onPick) {
+    _onPick = onPick;
+    _initAgents();
+    resize();
+    window.addEventListener('resize', resize);
+    canvas.addEventListener('click', (e) => {
+      const hit = _hitTest(e.clientX, e.clientY);
+      if (hit && _onPick) _onPick(hit.id);
+    });
+    requestAnimationFrame((t) => { _last = t; _frame(t); });
+  }
+
+  return { init, resize, setState, getAgent };
+})();
+
+/* ═══════════════════════════════════════════
+   ⑦ UI — Toast / Modal / Drawer rendering
+═══════════════════════════════════════════ */
+const UI = (() => {
+  'use strict';
+
+  function toast(msg, type = 'info') {
+    const wrap = document.getElementById('toastWrap');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  function _escape(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  function _format(text) {
+    return _escape(text)
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]*?)`/g, '<code>$1</code>')
+      .replace(/\n/g, '<br/>');
+  }
+
+  function appendMessage(role, content) {
+    const box = document.getElementById('drawerMessages');
+    const el = document.createElement('div');
+    el.className = `bubble ${role}`;
+    if (role === 'agent') el.innerHTML = _format(content);
+    else if (role === 'user') el.textContent = content;
+    else el.textContent = content;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+    return el;
+  }
+
+  function showTyping() {
+    const box = document.getElementById('drawerMessages');
+    const el = document.createElement('div');
+    el.className = 'bubble agent'; el.id = 'typingBubble';
+    el.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span>';
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+  function hideTyping() { document.getElementById('typingBubble')?.remove(); }
+
+  return { toast, appendMessage, showTyping, hideTyping };
+})();
+
+/* ═══════════════════════════════════════════
+   ⑨ APP_CORE — init · events · routing
+═══════════════════════════════════════════ */
+const APP_CORE = (() => {
+  'use strict';
+  const { AGENTS } = APP_CONFIG;
+  let _currentId  = null;
+  let _isSending  = false;
+  const _history  = {};   // agentId -> [{role,content}]
+
+  // ── API Key ──
+  function showApiModal() {
+    document.getElementById('apiModal').classList.remove('hidden');
+    const input = document.getElementById('apiKeyInput');
+    input.value = STATE_STORE.get('apiKey') || '';
+    setTimeout(() => input.focus(), 50);
+  }
+  function hideApiModal() { document.getElementById('apiModal').classList.add('hidden'); }
+
+  async function saveApiKey() {
+    const val = document.getElementById('apiKeyInput').value.trim();
+    if (!val) { UI.toast('กรุณากรอก API Key', 'warning'); return; }
+    STATE_STORE.set('apiKey', val);
+    try { await STORAGE_ENGINE.put('settings', { key: 'apiKey', value: val }); } catch (_) {}
+    hideApiModal();
+    UI.toast('บันทึก API Key แล้ว', 'success');
+    _updateApiBtn();
+  }
+
+  function _updateApiBtn() {
+    const has = !!STATE_STORE.get('apiKey');
+    const btn = document.getElementById('setApiBtn');
+    btn.textContent = has ? '🔑 API ✓' : '🔑 API Key';
+    btn.classList.toggle('btn-gold', !has);
+  }
+
+  // ── Drawer ──
+  function openDrawer(agentId) {
+    const agent = AGENTS[agentId];
+    if (!agent) return;
+    _currentId = agentId;
+    document.getElementById('drawerAvatar').textContent = agent.emoji;
+    document.getElementById('drawerName').textContent   = agent.name;
+    document.getElementById('drawerName').style.color   = agent.color;
+    document.getElementById('drawerRole').textContent   = `${agent.role} · ${agent.zone}`;
+
+    const box = document.getElementById('drawerMessages');
+    box.innerHTML = '';
+    const hist = _history[agentId] || [];
+    if (hist.length === 0) {
+      UI.appendMessage('system', `คุยกับ ${agent.name} (${agent.role}) — ${agent.zone}`);
+      UI.appendMessage('agent', `สวัสดีค่ะพี่ A 👋 ${agent.name}พร้อมช่วยแล้วค่ะ ถามได้เลย`);
+    } else {
+      hist.forEach(m => UI.appendMessage(m.role === 'assistant' ? 'agent' : 'user', m.content));
+    }
+
+    document.getElementById('drawerOverlay').classList.add('open');
+    document.getElementById('drawer').classList.add('open');
+    PIXEL_ENGINE.setState(agentId, 'idle', '💬');
+    setTimeout(() => document.getElementById('chatInput').focus(), 280);
+  }
+  function closeDrawer() {
+    document.getElementById('drawerOverlay').classList.remove('open');
+    document.getElementById('drawer').classList.remove('open');
+    if (_currentId) PIXEL_ENGINE.setState(_currentId, 'idle', '');
+    _currentId = null;
+  }
+
+  function clearChat() {
+    if (!_currentId) return;
+    _history[_currentId] = [];
+    const box = document.getElementById('drawerMessages');
+    box.innerHTML = '';
+    UI.appendMessage('system', 'ล้างประวัติแล้ว');
+  }
+
+  function handleInputKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  // ── Send message ──
+  async function sendMessage() {
+    if (_isSending || !_currentId) return;
+    const input = document.getElementById('chatInput');
+    const text  = input.value.trim();
+    if (!text) return;
+
+    if (!STATE_STORE.get('apiKey')) {
+      UI.toast('กรุณาตั้งค่า API Key ก่อน', 'warning');
+      showApiModal();
+      return;
+    }
+
+    const agent = AGENTS[_currentId];
+    const agentId = _currentId;
+    _isSending = true;
+    document.getElementById('sendBtn').disabled = true;
+    input.value = ''; input.style.height = 'auto';
+
+    UI.appendMessage('user', text);
+    (_history[agentId] = _history[agentId] || []).push({ role: 'user', content: text });
+    UI.showTyping();
+    PIXEL_ENGINE.setState(agentId, 'thinking');
+
+    try {
+      const ctx = await LIVE_DATA.buildContext(text);
+      const msg = ctx ? `${text}\n\n${ctx}` : text;
+      const hist = _history[agentId].slice(-10, -1);
+      const reply = await CLAUDE_BRIDGE.chat(agent, msg, hist);
+
+      UI.hideTyping();
+      UI.appendMessage('agent', reply);
+      _history[agentId].push({ role: 'assistant', content: reply });
+      PIXEL_ENGINE.setState(agentId, 'done', '💬');
+      try {
+        await STORAGE_ENGINE.put('chats', { id: `${agentId}_${Date.now()}`, agentId, role: 'assistant', content: reply, ts: Date.now() });
+      } catch (_) {}
+    } catch (err) {
+      UI.hideTyping();
+      const m = err.message === 'NO_API_KEY'
+        ? 'ยังไม่มี API Key ค่ะ กดปุ่ม API Key ด้านบน'
+        : `เกิดข้อผิดพลาด: ${err.message} — ลองใหม่นะคะ`;
+      UI.appendMessage('system', `⚠️ ${m}`);
+      PIXEL_ENGINE.setState(agentId, 'idle', '💬');
+    } finally {
+      _isSending = false;
+      document.getElementById('sendBtn').disabled = false;
+      input.focus();
+    }
+  }
+
+  // ── init ──
+  async function init() {
+    // restore API key
+    try {
+      const rec = await STORAGE_ENGINE.get('settings', 'apiKey');
+      if (rec && rec.value) STATE_STORE.set('apiKey', rec.value);
+    } catch (_) {}
+    _updateApiBtn();
+
+    // auto-resize textarea
+    const input = document.getElementById('chatInput');
+    input.addEventListener('input', function () {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+
+    // Esc to close drawer / modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (!document.getElementById('apiModal').classList.contains('hidden')) hideApiModal();
+      else if (document.getElementById('drawer').classList.contains('open')) closeDrawer();
+    });
+
+    // start the pixel world
+    PIXEL_ENGINE.init(openDrawer);
+
+    if (!STATE_STORE.get('apiKey')) {
+      setTimeout(() => UI.toast('👋 ตั้งค่า API Key เพื่อเริ่มคุยกับทีม', 'info'), 800);
+    }
+  }
+
+  return {
+    init, showApiModal, hideApiModal, saveApiKey,
+    openDrawer, closeDrawer, clearChat, handleInputKey, sendMessage,
+  };
+})();
+
+/* ── Bootstrap ── */
+document.addEventListener('DOMContentLoaded', () => APP_CORE.init());
+</script>
+</body>
+</html>
