@@ -298,7 +298,7 @@
 const APP_CONFIG = (() => {
   const PROXY_URL    = 'https://avi-proxy.supasiao.workers.dev';
   const CLAUDE_MODEL = 'claude-sonnet-4-5';
-  const MAX_TOKENS   = 1500;
+  const MAX_TOKENS   = 4096;
   const DB_NAME      = 'aviPixel';
   const DB_VERSION   = 1;
 
@@ -497,6 +497,18 @@ const CLAUDE_BRIDGE = (() => {
   const MAX_RETRIES = 3;
   const BACKOFF_MS  = [1000, 2000, 4000];
 
+  // กฎเหล็กเรื่องความถูกต้องของข้อมูล — แนบทุก agent (กระทบการลงทุนจริง)
+  const DATA_GUARDRAIL = `
+
+━━━ กฎเหล็กเรื่องข้อมูล (สำคัญสูงสุด — ห้ามฝ่าฝืน) ━━━
+ข้อมูลของพี่ A ใช้ตัดสินใจลงทุนจริง ข้อมูลผิด/ล้าสมัย = ขาดทุนได้ ดังนั้น:
+1. ห้ามเดา กุ หรือสมมติตัวเลขใดๆ เด็ดขาด (ราคา, % ปันผล, Yield, P/E, P/BV, DPS, EPS, ROE, วันที่ XD, ตัวเลขงบการเงิน, ระดับดัชนี ฯลฯ)
+2. ตัวเลขปัจจุบันให้ใช้เฉพาะที่อยู่ในบล็อก [ข้อมูลตลาดจริง] ที่แนบมาเท่านั้น
+3. ถ้าไม่มีข้อมูลที่ต้องใช้ → บอกตรงๆ ว่า "ไม่มีข้อมูลล่าสุด ต้องตรวจสอบจากแหล่งจริง (SET/Settrade/งบบริษัท) ก่อนตัดสินใจ" — ห้ามเติมตัวเลขเอง
+4. ตัวเลขจากความรู้ทั่วไป (training) อาจล้าสมัย → ถ้าจำเป็นต้องอ้าง ให้ระบุชัดว่า "เป็นค่าโดยประมาณ ต้องยืนยันอีกครั้ง"
+5. แยกให้ชัดระหว่าง "ข้อเท็จจริงที่มีข้อมูลรองรับ" กับ "ความเห็น/การวิเคราะห์เชิงหลักการ"
+6. ตอบให้ครบถ้วน จบความทุกหัวข้อ ห้ามตัดค้างกลางประโยคหรือกลางตาราง`;
+
   const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
   async function _call(systemPrompt, messages, attempt = 0) {
@@ -537,7 +549,7 @@ const CLAUDE_BRIDGE = (() => {
         ...history.map(h => ({ role: h.role, content: h.content })),
         { role: 'user', content: userMessage },
       ];
-      return _call(agent.systemPrompt, messages);
+      return _call(agent.systemPrompt + DATA_GUARDRAIL, messages);
     },
   };
 })();
