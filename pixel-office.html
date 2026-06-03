@@ -261,6 +261,7 @@
       <button class="btn btn-gold" id="sendBtn" onclick="APP_CORE.sendMessage()" style="min-height:44px;">ส่ง</button>
     </div>
     <div style="font-size:0.66rem; color:#475569; text-align:center; margin-top:6px;">Enter = ส่ง · Shift+Enter = บรรทัดใหม่</div>
+    <div style="font-size:0.64rem; color:#475569; text-align:center; margin-top:4px; line-height:1.5;">⚠️ ข้อมูลเพื่อการศึกษา ไม่ใช่คำแนะนำการลงทุน · ตรวจสอบตัวเลขจากแหล่งจริงก่อนลงทุน</div>
   </div>
 </aside>
 
@@ -465,27 +466,86 @@ const LIVE_DATA = (() => {
     return out;
   }
 
-  // สร้างบริบทตัวเลขจริงให้ AI อ้างอิง (ห้ามเดา)
-  async function buildContext(question) {
+  async function fetchDividend(symbol) {
+    const key = `div_${symbol}`;
+    const now = Date.now();
+    if (_cache[key] && (now - _cache[key].ts) < CACHE_TTL) return _cache[key].data;
+    try {
+      const res = await fetch(`${PROXY_URL}/dividend?symbol=${encodeURIComponent(symbol)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.error) return null;
+      _cache[key] = { data, ts: now };
+      return data;
+    } catch (_) { return null; }
+  }
+
+  // สร้างบริบทตัวเลขจริงให้ AI อ้างอิง (role-aware, ห้ามเดา) → { text, hasData, time }
+  async function buildContext(question, agentId = '') {
+    const q = question || '';
     const lines = [];
+    let hasData = false;
+
     const [setD, fxD] = await Promise.all([fetchStock('^SET.BK'), fetchStock('USDTHB=X')]);
     if (setD) lines.push(`SET Index: ${setD.price.toFixed(2)} (${setD.change >= 0 ? '+' : ''}${setD.changePct.toFixed(2)}%)`);
     if (fxD)  lines.push(`USD/THB: ${fxD.price.toFixed(2)} (${fxD.change >= 0 ? '+' : ''}${fxD.change.toFixed(4)})`);
 
-    const mentioned = (question || '').match(/\b[A-Z]{2,6}\b/g) || [];
-    const syms = [...new Set(mentioned.map(t => t.toUpperCase()).filter(t => !STOP.has(t)))];
-    if (syms.length > 0) {
-      const prices = await fetchMultiple(syms.map(s => `${s}.BK`));
-      syms.forEach(s => {
+    const mentioned = (q.match(/\b[A-Z]{2,6}\b/g) || []).map(t => t.toUpperCase()).filter(t => !STOP.has(t));
+    const thaiSyms = [...new Set(mentioned)];
+
+    if (thaiSyms.length > 0) {
+      const prices = await fetchMultiple(thaiSyms.map(s => `${s}.BK`));
+      thaiSyms.forEach(s => {
         const d = prices[`${s}.BK`];
-        if (d) lines.push(`${s}: ${d.price.toFixed(2)} บาท (${d.change >= 0 ? '+' : ''}${d.changePct.toFixed(2)}%)`);
+        if (d) { lines.push(`${s}: ${d.price.toFixed(2)} บาท (${d.change >= 0 ? '+' : ''}${d.changePct.toFixed(2)}%)`); hasData = true; }
       });
     }
-    if (lines.length === 0) return '';
-    return `[ข้อมูลตลาดจริง ณ ตอนนี้ — ใช้ตัวเลขเหล่านี้เท่านั้น ห้ามเดา/แต่งราคาเอง ถ้าไม่มีข้อมูลให้บอกว่าไม่มีข้อมูลล่าสุด]\n${lines.join('\n')}`;
+
+    // หุ้น/ETF ต่างประเทศ (ซาร่า หรือคำถาม global)
+    const isGlobal = agentId === 'sa' || /\b(US|NYSE|NASDAQ|S&P|ETF|SCHD|VYM|VOO|QQQ)\b/i.test(q) || /หุ้น(นอก|เทศ|ต่างประเทศ|อเมริกา)|ต่างประเทศ/.test(q);
+    if (isGlobal && mentioned.length > 0) {
+      const gp = await fetchMultiple(mentioned);
+      mentioned.forEach(s => {
+        const d = gp[s];
+        if (d) { lines.push(`${s} (Global): ${d.price.toFixed(2)} ${d.currency || ''} (${d.change >= 0 ? '+' : ''}${d.changePct.toFixed(2)}%)`); hasData = true; }
+      });
+    }
+
+    // ปันผลจริง (มินตรา หรือถามปันผล)
+    const wantDiv = agentId === 'mi' || /ปันผล|dividend|yield|เงินปันผล/i.test(q);
+    if (wantDiv && thaiSyms.length > 0) {
+      const picks = thaiSyms.slice(0, 4);
+      const divs = await Promise.all(picks.map(s => fetchDividend(`${s}.BK`)));
+      picks.forEach((s, i) => {
+        const d = divs[i];
+        if (d && (d.annualDPS != null || d.dividendYield != null)) {
+          const hist = (d.yearlyHistory || []).slice(0, 5).reverse().map(h => `${h.year}:${h.total.toFixed(2)}`).join(', ');
+          lines.push(`${s} ปันผลจริง: DPS ${d.annualDPS != null ? d.annualDPS.toFixed(2) : '-'} บาท, Yield ${d.dividendYield != null ? d.dividendYield.toFixed(2) : '-'}%, XD ${d.nextXD || '-'}, ประวัติบาท/ปี [${hist}]`);
+          hasData = true;
+        }
+      });
+    }
+
+    // Macro basket (ดร.ปิยะ หรือคำถามเศรษฐกิจ)
+    const wantMacro = agentId === 'pi' || /macro|เศรษฐกิจ|ดอกเบี้ย|เงินเฟ้อ|fed|ธปท|น้ำมัน|ทองคำ|ตลาดโลก|gdp|recession|วิกฤต/i.test(q);
+    if (wantMacro) {
+      const macro = await fetchMultiple(['GC=F', 'CL=F', '^GSPC', '^IXIC', '^TNX', '^VIX']);
+      const LABEL = { 'GC=F': 'ทองคำ (USD/oz)', 'CL=F': 'น้ำมัน WTI (USD)', '^GSPC': 'S&P 500', '^IXIC': 'Nasdaq', '^TNX': 'US 10Y Yield (%)', '^VIX': 'VIX' };
+      Object.keys(LABEL).forEach(sym => {
+        const d = macro[sym];
+        if (d) { lines.push(`${LABEL[sym]}: ${d.price.toFixed(2)} (${d.change >= 0 ? '+' : ''}${d.changePct.toFixed(2)}%)`); hasData = true; }
+      });
+    }
+
+    const time = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+    if (lines.length === 0) return { text: '', hasData: false, time };
+    const text = `[ข้อมูลตลาดจริง ณ ${time} น. — ที่มา: Yahoo Finance (ดีเลย์ ~15-20 นาที หรือราคาปิดล่าสุด)
+ใช้ตัวเลขเหล่านี้เท่านั้น ห้ามเดา/แต่งตัวเลขเอง ถ้าตัวเลขที่ต้องใช้ไม่อยู่ในรายการนี้ ให้บอกว่า "ไม่มีข้อมูลในระบบ"]
+${lines.join('\n')}`;
+    return { text, hasData, time };
   }
 
-  return { fetchStock, fetchMultiple, buildContext };
+  return { fetchStock, fetchMultiple, fetchDividend, buildContext };
 })();
 
 /* ═══════════════════════════════════════════
@@ -816,19 +876,76 @@ const UI = (() => {
 
   function _escape(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+  function _inline(s) {
+    return _escape(s)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+?)`/g, '<code>$1</code>');
+  }
+  function _splitRow(line) {
+    let s = line.trim();
+    if (s.startsWith('|')) s = s.slice(1);
+    if (s.endsWith('|'))   s = s.slice(0, -1);
+    return s.split('|').map(c => c.trim());
+  }
+  function _renderTable(header, rows) {
+    const th = header.map(c => `<th style="text-align:left;padding:6px 9px;border-bottom:2px solid rgba(240,192,64,0.35);color:#f5d070;font-weight:500;white-space:nowrap;">${_inline(c)}</th>`).join('');
+    const trs = rows.map(r => `<tr>${r.map(c => `<td style="padding:6px 9px;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top;">${_inline(c)}</td>`).join('')}</tr>`).join('');
+    return `<div style="overflow-x:auto;margin:10px 0;"><table style="border-collapse:collapse;width:100%;font-size:0.82rem;"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  }
   function _format(text) {
-    return _escape(text)
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/`([^`]*?)`/g, '<code>$1</code>')
-      .replace(/\n/g, '<br/>');
+    const lines = (text || '').split('\n');
+    let html = ''; let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const isRow  = line.includes('|');
+      const sepNxt = i + 1 < lines.length && lines[i + 1].includes('|') && /^[\s|:-]*-[\s|:-]*$/.test(lines[i + 1].trim());
+      if (isRow && sepNxt) {
+        const header = _splitRow(line); i += 2; const rows = [];
+        while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') { rows.push(_splitRow(lines[i])); i++; }
+        html += _renderTable(header, rows); continue;
+      }
+      const h = line.match(/^(#{1,4})\s+(.*)$/);
+      if (h) { html += `<div style="font-weight:600;color:#f5d070;margin:10px 0 4px;">${_inline(h[2])}</div>`; i++; continue; }
+      if (/^\s*---+\s*$/.test(line)) { html += '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:10px 0;"/>'; i++; continue; }
+      const b = line.match(/^\s*[-•]\s+(.*)$/);
+      if (b) { html += `<div style="padding-left:16px;position:relative;margin:2px 0;"><span style="position:absolute;left:2px;color:#f0c040;">•</span>${_inline(b[1])}</div>`; i++; continue; }
+      html += line.trim() === '' ? '<div style="height:7px;"></div>' : `<div>${_inline(line)}</div>`;
+      i++;
+    }
+    return html;
   }
 
-  function appendMessage(role, content) {
+  function _attachFooter(foot, rawContent, meta) {
+    if (!foot) return;
+    if (meta && meta.level === 'data') {
+      const b = document.createElement('span');
+      b.style.cssText = 'font-size:0.62rem;color:#6ee7b7;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);padding:2px 8px;border-radius:100px;';
+      b.textContent = `🟢 อิงข้อมูลจริง ณ ${meta.time || ''} น. · Yahoo (ดีเลย์)`;
+      foot.appendChild(b);
+    } else if (meta && meta.level === 'principle') {
+      const b = document.createElement('span');
+      b.style.cssText = 'font-size:0.62rem;color:#fcd34d;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.25);padding:2px 8px;border-radius:100px;';
+      b.textContent = '🟡 เชิงหลักการ — ไม่มีตัวเลขเฉพาะในระบบ';
+      foot.appendChild(b);
+    }
+    const copy = document.createElement('button');
+    copy.style.cssText = 'font-size:0.62rem;color:#94a3b8;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);padding:2px 8px;border-radius:100px;cursor:pointer;';
+    copy.textContent = '📋 คัดลอก';
+    copy.addEventListener('click', () => {
+      const done = () => { copy.textContent = '✓ คัดลอกแล้ว'; setTimeout(() => { copy.textContent = '📋 คัดลอก'; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(rawContent).then(done).catch(() => {});
+    });
+    foot.appendChild(copy);
+  }
+
+  function appendMessage(role, content, meta) {
     const box = document.getElementById('drawerMessages');
     const el = document.createElement('div');
     el.className = `bubble ${role}`;
-    if (role === 'agent') el.innerHTML = _format(content);
-    else if (role === 'user') el.textContent = content;
+    if (role === 'agent') {
+      el.innerHTML = `<div>${_format(content)}</div><div class="msg-foot" style="display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap;"></div>`;
+      _attachFooter(el.querySelector('.msg-foot'), content, meta);
+    } else if (role === 'user') el.textContent = content;
     else el.textContent = content;
     box.appendChild(el);
     box.scrollTop = box.scrollHeight;
@@ -953,13 +1070,13 @@ const APP_CORE = (() => {
     PIXEL_ENGINE.setState(agentId, 'thinking');
 
     try {
-      const ctx = await LIVE_DATA.buildContext(text);
-      const msg = ctx ? `${text}\n\n${ctx}` : text;
+      const ctx = await LIVE_DATA.buildContext(text, agentId);
+      const msg = ctx.text ? `${text}\n\n${ctx.text}` : text;
       const hist = _history[agentId].slice(-10, -1);
       const reply = await CLAUDE_BRIDGE.chat(agent, msg, hist);
 
       UI.hideTyping();
-      UI.appendMessage('agent', reply);
+      UI.appendMessage('agent', reply, { level: ctx.hasData ? 'data' : 'principle', time: ctx.time });
       _history[agentId].push({ role: 'assistant', content: reply });
       PIXEL_ENGINE.setState(agentId, 'done', '💬');
       try {
