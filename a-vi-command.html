@@ -9,7 +9,16 @@
     else { document.documentElement.removeAttribute('data-theme'); document.documentElement.classList.add('dark'); }
   } catch(e){} })();
 </script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="A-VI Command"/>
+<meta name="theme-color" content="#050d1a"/>
+<meta name="description" content="ห้องทำงานเสมือนจริง AI ที่ปรึกษาการลงทุน 9 ผู้เชี่ยวชาญ"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg"/>
 <title>A-VI Command — Investment Virtual Office</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -773,6 +782,238 @@ tailwind.config = {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
   }
+
+  /* ══════════════════════════════════════════
+     MOBILE / PWA STYLES (Samsung S26 Ultra)
+  ══════════════════════════════════════════ */
+
+  /* Safe area padding for punch-hole screens */
+  body {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Disable double-tap zoom on interactive elements */
+  button, .room-card, .hotspot, .tab-btn, .wl-badge, .metric-card {
+    touch-action: manipulation;
+  }
+
+  /* ── Bottom Navigation (mobile only) ─── */
+  .bottom-nav-mobile {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 150;
+    background: var(--header-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid var(--header-border);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+  }
+  .bottom-nav-inner {
+    display: flex;
+    height: 60px;
+    align-items: stretch;
+  }
+  .bnav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    cursor: pointer;
+    position: relative;
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s;
+  }
+  .bnav-item:active { opacity: 0.7; }
+  .bnav-icon {
+    font-size: 1.35rem;
+    line-height: 1;
+    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .bnav-label {
+    font-size: 0.55rem;
+    font-weight: 600;
+    color: var(--text-2);
+    font-family: 'Noto Sans Thai', sans-serif;
+    transition: color 0.2s;
+  }
+  .bnav-item.active .bnav-icon { transform: translateY(-2px) scale(1.15); }
+  .bnav-item.active .bnav-label { color: var(--gold-400); }
+  .bnav-badge {
+    position: absolute;
+    top: 6px; right: calc(50% - 18px);
+    width: 8px; height: 8px;
+    background: var(--rose-400);
+    border-radius: 50%;
+    border: 2px solid var(--bg-page);
+  }
+
+  /* ── FAB Button ─────────────────────────── */
+  .fab-btn {
+    display: none;
+    position: fixed;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    right: 20px;
+    z-index: 140;
+    width: 52px; height: 52px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--gold-400), #d97706);
+    border: none;
+    cursor: pointer;
+    align-items: center; justify-content: center;
+    font-size: 1.4rem;
+    box-shadow: 0 4px 20px rgba(240,192,64,0.45), 0 2px 8px rgba(0,0,0,0.3);
+    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fab-btn:active { transform: scale(0.93); }
+
+  /* ── Install Prompt Banner ──────────────── */
+  #installBanner {
+    display: none;
+    position: fixed;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    left: 12px; right: 12px;
+    z-index: 160;
+    background: var(--navy-800);
+    border: 1px solid rgba(240,192,64,0.35);
+    border-radius: 16px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    animation: slide-up 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes slide-up {
+    from { opacity:0; transform: translateY(20px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+
+  /* ── Agent Switcher Pill Strip (chat) ─── */
+  .agent-switcher-strip {
+    display: none;
+    gap: 6px;
+    padding: 6px 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--surface-2-border);
+    flex-shrink: 0;
+  }
+  .agent-switcher-strip::-webkit-scrollbar { display: none; }
+  .agent-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--surface-2-border);
+    border-radius: 20px;
+    padding: 4px 10px 4px 5px;
+    white-space: nowrap;
+    cursor: pointer;
+    font-size: 0.65rem;
+    color: var(--text-2);
+    flex-shrink: 0;
+    min-height: 32px;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .agent-pill.active {
+    background: rgba(240,192,64,0.12);
+    border-color: rgba(240,192,64,0.4);
+    color: var(--gold-300);
+  }
+  .agent-pill-avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+
+  /* ── Mobile View Management ─────────────── */
+  @media (max-width: 768px) {
+
+    /* Show Bottom Nav & FAB */
+    .bottom-nav-mobile { display: flex; flex-direction: column; }
+    .fab-btn { display: flex; }
+
+    /* Push content above bottom nav */
+    body > main { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+
+    /* Hide desktop brand badge */
+    .brand-badge { display: none !important; }
+
+    /* Header compact on mobile */
+    header.header-glass { padding-left: 14px; padding-right: 14px; }
+    header.header-glass h1 { font-size: 1rem; }
+    header.header-glass p { display: none; }
+
+    /* System status — hide text keep dot */
+    #systemStatusText { display: none; }
+
+    /* Main section horizontal padding */
+    main { padding-left: 12px !important; padding-right: 12px !important; }
+
+    /* Office map section: reduce padding */
+    main > section:first-child { padding: 10px !important; }
+
+    /* Bottom layout: stack vertically */
+    .bottom-layout {
+      grid-template-columns: 1fr !important;
+      height: auto !important;
+    }
+
+    /* Dashboard & Chat sections: min-height reduce */
+    .bottom-layout > section { min-height: 360px !important; }
+
+    /* Agent grid: 3 columns on mobile */
+    .office-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 8px !important; }
+
+    /* Room cards: more compact */
+    .room-card { min-height: 90px !important; padding: 10px 6px !important; gap: 4px; }
+    .character { font-size: 1.8rem !important; }
+
+    /* Chat messages panel: full available height */
+    .chat-messages { padding: 10px 12px !important; }
+    .msg-bubble { font-size: 0.82rem !important; }
+
+    /* Agent switcher strip: show on mobile chat */
+    .agent-switcher-strip { display: flex; }
+
+    /* Chat input: larger touch target */
+    .chat-input { font-size: 1rem !important; padding: 12px 14px !important; }
+    .send-btn { padding: 12px 16px !important; min-height: 44px; }
+
+    /* Tab buttons: full row, easy tap */
+    .tab-btn { padding: 8px 10px !important; font-size: 0.72rem !important; min-height: 36px; }
+
+    /* Metric cards: 2 cols already, just touch-friendly */
+    .metric-card { padding: 10px 12px !important; }
+
+    /* Ticker: smaller text */
+    .stock-chip { font-size: 0.62rem !important; }
+
+    /* Modal: full-width on mobile */
+    .modal-box { max-width: calc(100vw - 32px) !important; padding: 20px !important; }
+
+    /* Map mode button: easier to tap */
+    #mapModeBtn { min-height: 36px; padding: 6px 12px; }
+
+    /* Hotspot tags: already have responsive CSS, reinforce */
+    .hotspot-tag { white-space: nowrap; }
+  }
+
+  /* Extra small (≤480px) — Samsung S26 Ultra portrait */
+  @media (max-width: 480px) {
+    .office-grid { grid-template-columns: repeat(3, 1fr) !important; }
+    .room-card { min-height: 80px !important; }
+    .character { font-size: 1.5rem !important; }
+    header.header-glass h1 { font-size: 0.9rem; }
+  }
 </style>
 </head>
 
@@ -1174,6 +1415,37 @@ tailwind.config = {
         </div>
       </div>
 
+      <!-- Agent Switcher Strip (mobile) -->
+      <div class="agent-switcher-strip" id="agentSwitcherStrip">
+        <div class="agent-pill active" data-agent="ph">
+          <div class="agent-pill-avatar">👩‍💼</div>แพร
+        </div>
+        <div class="agent-pill" data-agent="wi">
+          <div class="agent-pill-avatar">📊</div>วิชัย
+        </div>
+        <div class="agent-pill" data-agent="sa">
+          <div class="agent-pill-avatar">🌏</div>ซาร่า
+        </div>
+        <div class="agent-pill" data-agent="ki">
+          <div class="agent-pill-avatar">📦</div>กิตติ์
+        </div>
+        <div class="agent-pill" data-agent="mi">
+          <div class="agent-pill-avatar">💰</div>มินตรา
+        </div>
+        <div class="agent-pill" data-agent="na">
+          <div class="agent-pill-avatar">🔍</div>ณัฐ
+        </div>
+        <div class="agent-pill" data-agent="pi">
+          <div class="agent-pill-avatar">🌐</div>ดร.ปิยะ
+        </div>
+        <div class="agent-pill" data-agent="so">
+          <div class="agent-pill-avatar">⚖️</div>สมชาย
+        </div>
+        <div class="agent-pill" data-agent="wa">
+          <div class="agent-pill-avatar">🧘</div>อ.วรรณ
+        </div>
+      </div>
+
       <!-- Messages -->
       <div class="chat-messages flex-1" id="chatMessages">
         <!-- Welcome message filled by JS -->
@@ -1380,6 +1652,67 @@ tailwind.config = {
   <span>Supasit.A</span>
   <span style="color:#475569; font-size:0.65rem; font-family:'JetBrains Mono',monospace;">v1.0</span>
 </div>
+
+<!-- ══════════════════════════════════════════
+     PWA: INSTALL BANNER (mobile)
+══════════════════════════════════════════ -->
+<div id="installBanner">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--gold-400),#d97706);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">🏢</div>
+    <div style="flex:1;">
+      <div style="font-size:0.8rem;font-weight:700;color:var(--text-1);">ติดตั้ง A-VI Command</div>
+      <div style="font-size:0.68rem;color:var(--text-2);margin-top:2px;">เพิ่มลงหน้าจอหลักเพื่อใช้งานแบบ App</div>
+    </div>
+    <button id="installBtn"
+      style="background:linear-gradient(135deg,var(--gold-400),#d97706);color:var(--navy-950);border:none;border-radius:8px;padding:8px 14px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Noto Sans Thai',sans-serif;">
+      ติดตั้ง
+    </button>
+    <button id="installDismiss"
+      style="background:transparent;border:none;color:var(--text-2);cursor:pointer;font-size:1.1rem;padding:4px;line-height:1;">✕</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     FAB BUTTON (mobile)
+══════════════════════════════════════════ -->
+<button class="fab-btn" id="fabBtn" title="เปิดแชท" aria-label="เปิดแชท">
+  💬
+</button>
+
+<!-- ══════════════════════════════════════════
+     BOTTOM NAVIGATION (mobile)
+══════════════════════════════════════════ -->
+<nav class="bottom-nav-mobile" role="navigation" aria-label="เมนูหลัก">
+  <div class="bottom-nav-inner">
+
+    <div class="bnav-item active" data-nav="home" role="button" tabindex="0" aria-label="หน้าแรก">
+      <div class="bnav-icon">🏠</div>
+      <div class="bnav-label">หน้าแรก</div>
+    </div>
+
+    <div class="bnav-item" data-nav="chat" role="button" tabindex="0" aria-label="แชท">
+      <div class="bnav-icon">💬</div>
+      <div class="bnav-label">แชท</div>
+      <div class="bnav-badge" id="chatBadge" style="display:none;"></div>
+    </div>
+
+    <div class="bnav-item" data-nav="portfolio" role="button" tabindex="0" aria-label="พอร์ต">
+      <div class="bnav-icon">📊</div>
+      <div class="bnav-label">พอร์ต</div>
+    </div>
+
+    <div class="bnav-item" data-nav="watchlist" role="button" tabindex="0" aria-label="Watchlist">
+      <div class="bnav-icon">📈</div>
+      <div class="bnav-label">Watchlist</div>
+    </div>
+
+    <div class="bnav-item" data-nav="settings" role="button" tabindex="0" aria-label="ตั้งค่า">
+      <div class="bnav-icon">⚙️</div>
+      <div class="bnav-label">ตั้งค่า</div>
+    </div>
+
+  </div>
+</nav>
 
 <!-- ══════════════════════════════════════════
      JAVASCRIPT
@@ -2824,6 +3157,7 @@ const APP_CORE = (() => {
     if (hotspotEl) hotspotEl.classList.add('active');
 
     _currentAgentId = agentId;
+    STATE_STORE.set('activeAgent', agentId);
     UI_RENDERER.updateAgentHeader(agentId);
 
     // Load chat history for this agent
@@ -3380,6 +3714,94 @@ document.addEventListener('DOMContentLoaded', () => {
       this.style.height = Math.min(this.scrollHeight, 120) + 'px';
     });
   }
+
+  /* ── Mobile Bottom Nav active state ─────── */
+  function updateBottomNav(activeId) {
+    document.querySelectorAll('.bnav-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.nav === activeId);
+    });
+  }
+
+  /* ── Bottom Nav click handlers ───────────── */
+  document.querySelectorAll('.bnav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const nav = item.dataset.nav;
+      updateBottomNav(nav);
+      if (nav === 'home') {
+        /* scroll to top of agent map */
+        document.querySelector('main > section')?.scrollIntoView({ behavior: 'smooth' });
+      } else if (nav === 'chat') {
+        /* scroll to chat panel */
+        document.getElementById('chatPanel')?.scrollIntoView({ behavior: 'smooth' });
+        /* vibrate on tap */
+        navigator.vibrate?.(10);
+      } else if (nav === 'portfolio') {
+        document.getElementById('tab-portfolio')?.closest('section')?.scrollIntoView({ behavior: 'smooth' });
+        APP_CORE.switchTab('portfolio', document.querySelector('.tab-btn:nth-child(2)'));
+      } else if (nav === 'watchlist') {
+        APP_CORE.switchTab('watchlist', document.querySelector('.tab-btn:nth-child(4)'));
+        document.getElementById('tab-watchlist')?.closest('section')?.scrollIntoView({ behavior: 'smooth' });
+      } else if (nav === 'settings') {
+        APP_CORE.showApiModal();
+      }
+    });
+  });
+
+  /* FAB → open chat */
+  document.getElementById('fabBtn')?.addEventListener('click', () => {
+    updateBottomNav('chat');
+    document.getElementById('chatPanel')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('chatInput')?.focus();
+    navigator.vibrate?.(15);
+  });
+
+  /* ── PWA: Service Worker ─────────────────── */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+
+  /* ── PWA: Install Prompt ─────────────────── */
+  let _deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredPrompt = e;
+    const banner = document.getElementById('installBanner');
+    if (banner && !localStorage.getItem('pwa-dismissed')) {
+      banner.style.display = 'block';
+    }
+  });
+  document.getElementById('installBtn')?.addEventListener('click', async () => {
+    if (!_deferredPrompt) return;
+    _deferredPrompt.prompt();
+    const { outcome } = await _deferredPrompt.userChoice;
+    _deferredPrompt = null;
+    document.getElementById('installBanner').style.display = 'none';
+    if (outcome === 'accepted') localStorage.setItem('pwa-dismissed', '1');
+  });
+  document.getElementById('installDismiss')?.addEventListener('click', () => {
+    document.getElementById('installBanner').style.display = 'none';
+    localStorage.setItem('pwa-dismissed', '1');
+  });
+
+  /* ── Agent Pill Switcher (mobile chat) ───── */
+  document.querySelectorAll('.agent-pill[data-agent]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const agentId = pill.dataset.agent;
+      APP_CORE.selectAgent(agentId);
+      document.querySelectorAll('.agent-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+  });
+
+  /* Observe state changes to keep pill in sync */
+  STATE_STORE.on('activeAgent', (agentId) => {
+    document.querySelectorAll('.agent-pill[data-agent]').forEach(p => {
+      p.classList.toggle('active', p.dataset.agent === agentId);
+    });
+  });
+
+  /* Set home as active nav on load */
+  updateBottomNav('home');
 });
 </script>
 </body>
