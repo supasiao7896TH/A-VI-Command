@@ -3,7 +3,7 @@
   "short_name": "A-VI Command",
   "description": "ห้องทำงานเสมือนจริง AI ที่ปรึกษาการลงทุน 9 ผู้เชี่ยวชาญ",
   "lang": "th",
-  "start_url": "./a-vi-command.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#050d1a",
