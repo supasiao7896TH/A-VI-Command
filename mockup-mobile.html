@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A-VI Command — Mobile Mockup (Samsung S26 Ultra)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  h1 { font-size: 1.1rem; text-align: center; color: #fbbf24; margin-bottom: 4px; }
+  .subtitle { font-size: 0.75rem; text-align: center; color: #94a3b8; margin-bottom: 32px; }
+
+  /* Layout: show screens side by side */
+  .screens-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    margin-bottom: 40px;
+  }
+
+  .screen-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .screen-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+  }
+
+  /* Phone frame */
+  .phone {
+    width: 320px;
+    height: 680px;
+    background: #1e293b;
+    border-radius: 40px;
+    border: 3px solid #334155;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px #0f172a, 0 20px 60px rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 12px; left: 50%; transform: translateX(-50%);
+    width: 80px; height: 8px;
+    background: #0f172a;
+    border-radius: 4px;
+    z-index: 10;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 28px;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-size: 0.6rem;
+    color: #94a3b8;
+    flex-shrink: 0;
+    margin-top: 20px;
+  }
+
+  /* App header */
+  .app-header {
+    background: rgba(15,23,42,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(251,191,36,0.15);
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .app-logo { display: flex; align-items: center; gap: 6px; }
+  .logo-dot {
+    width: 22px; height: 22px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.55rem; font-weight: 900; color: #1e293b;
+  }
+  .logo-text { font-size: 0.72rem; font-weight: 700; color: #fbbf24; }
+  .header-actions { display: flex; gap: 6px; }
+  .icon-btn {
+    width: 28px; height: 28px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  /* Ticker */
+  .ticker {
+    background: rgba(0,0,0,0.5);
+    padding: 5px 14px;
+    display: flex;
+    gap: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .tick-chip {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.52rem;
+    white-space: nowrap;
+    color: #94a3b8;
+  }
+  .tick-chip .up { color: #34d399; }
+  .tick-chip .dn { color: #f87171; }
+
+  /* Screen content */
+  .screen-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── SCREEN 1: HOME / AGENT SELECT ─── */
+  .section-title {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #64748b;
+    padding: 8px 14px 4px;
+    font-weight: 700;
+  }
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 4px 10px 8px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .agent-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 8px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .agent-card.gold { border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.05); }
+  .agent-card.sky  { border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.04); }
+  .agent-card.teal { border-color: rgba(45,212,191,0.3); background: rgba(45,212,191,0.04); }
+  .agent-card.violet { border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.04); }
+  .agent-card.selected { box-shadow: 0 0 0 2px #fbbf24; }
+
+  .agent-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    background: rgba(255,255,255,0.06);
+  }
+  .agent-name { font-size: 0.55rem; font-weight: 700; color: #e2e8f0; text-align: center; }
+  .agent-role { font-size: 0.45rem; color: #64748b; text-align: center; line-height: 1.2; }
+  .agent-badge {
+    font-size: 0.38rem;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .badge-gold { background: rgba(251,191,36,0.2); color: #fbbf24; }
+  .badge-sky  { background: rgba(56,189,248,0.2); color: #38bdf8; }
+  .badge-teal { background: rgba(45,212,191,0.2); color: #2dd4bf; }
+  .badge-violet { background: rgba(167,139,250,0.2); color: #a78bfa; }
+
+  /* ─── SCREEN 2: CHAT ─── */
+  .chat-agent-strip {
+    display: flex;
+    gap: 6px;
+    padding: 6px 10px;
+    overflow-x: auto;
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.3);
+  }
+  .chat-agent-pill {
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 3px 8px 3px 4px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .chat-agent-pill.active {
+    background: rgba(251,191,36,0.12);
+    border-color: rgba(251,191,36,0.4);
+  }
+  .pill-avatar { width: 18px; height: 18px; border-radius: 50%; font-size: 0.6rem; text-align: center; line-height: 18px; background: rgba(255,255,255,0.07); }
+  .pill-name { font-size: 0.52rem; color: #e2e8f0; }
+
+  .chat-messages {
+    flex: 1;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+  }
+  .msg {
+    max-width: 85%;
+    padding: 6px 10px;
+    border-radius: 12px;
+    font-size: 0.55rem;
+    line-height: 1.5;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: rgba(251,191,36,0.15);
+    border: 1px solid rgba(251,191,36,0.3);
+    color: #fde68a;
+  }
+  .msg.agent {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #e2e8f0;
+  }
+  .msg-sender { font-size: 0.45rem; color: #64748b; margin-bottom: 2px; font-weight: 700; }
+  .typing { display: flex; gap: 3px; align-items: center; padding: 4px 0; }
+  .typing span {
+    width: 5px; height: 5px; background: #64748b; border-radius: 50%;
+    animation: bounce 0.9s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce { 0%,80%,100%{ transform:translateY(0) } 40%{ transform:translateY(-4px) } }
+
+  .chat-input-area {
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.4);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+  .chat-textarea {
+    flex: 1;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 0.55rem;
+    color: #94a3b8;
+    resize: none;
+  }
+  .send-btn {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+    color: #1e293b;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* ─── SCREEN 3: DASHBOARD ─── */
+  .dash-tabs {
+    display: flex;
+    padding: 6px 10px 0;
+    gap: 2px;
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.3);
+  }
+  .dash-tab {
+    flex: 1;
+    padding: 5px 4px;
+    font-size: 0.5rem;
+    text-align: center;
+    border-radius: 6px 6px 0 0;
+    color: #64748b;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .dash-tab.active {
+    background: rgba(251,191,36,0.1);
+    color: #fbbf24;
+    border-bottom: 2px solid #fbbf24;
+  }
+
+  .dash-content {
+    flex: 1;
+    padding: 8px 10px;
+    overflow-y: auto;
+  }
+
+  .metric-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .metric-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 8px;
+  }
+  .metric-label { font-size: 0.45rem; color: #64748b; margin-bottom: 3px; }
+  .metric-value { font-size: 0.85rem; font-weight: 700; color: #fbbf24; }
+  .metric-sub { font-size: 0.42rem; color: #34d399; }
+
+  .portfolio-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 7px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px;
+  }
+  .stock-info {}
+  .stock-ticker { font-size: 0.65rem; font-weight: 800; color: #e2e8f0; }
+  .stock-name { font-size: 0.45rem; color: #64748b; }
+  .stock-pnl { text-align: right; }
+  .pnl-value { font-size: 0.6rem; font-weight: 700; }
+  .pnl-pct { font-size: 0.42rem; color: #94a3b8; }
+  .green { color: #34d399; }
+  .red { color: #f87171; }
+
+  /* Bottom Navigation */
+  .bottom-nav {
+    height: 60px;
+    background: rgba(15,23,42,0.98);
+    border-top: 1px solid rgba(255,255,255,0.07);
+    display: flex;
+    align-items: center;
+    padding-bottom: 4px;
+    flex-shrink: 0;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding-top: 6px;
+    cursor: pointer;
+    position: relative;
+  }
+  .nav-icon { font-size: 1.1rem; }
+  .nav-label { font-size: 0.42rem; color: #64748b; font-weight: 600; }
+  .nav-item.active .nav-label { color: #fbbf24; }
+  .nav-item.active .nav-icon { filter: drop-shadow(0 0 4px #fbbf24); }
+  .nav-dot {
+    position: absolute;
+    top: 2px; right: 24px;
+    width: 6px; height: 6px;
+    background: #f87171;
+    border-radius: 50%;
+    font-size: 0;
+  }
+
+  /* FAB */
+  .fab {
+    position: absolute;
+    bottom: 68px;
+    right: 14px;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    color: #1e293b;
+    box-shadow: 0 4px 20px rgba(251,191,36,0.4);
+  }
+
+  /* ─── FEATURE ANNOTATIONS ─── */
+  .annotations {
+    max-width: 1100px;
+    margin: 0 auto 40px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 20px 24px;
+  }
+  .annotations h2 { font-size: 0.85rem; color: #fbbf24; margin-bottom: 16px; }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  .feature-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .feature-card h3 { font-size: 0.72rem; color: #38bdf8; margin-bottom: 6px; }
+  .feature-card ul { list-style: none; }
+  .feature-card li {
+    font-size: 0.62rem;
+    color: #94a3b8;
+    padding: 2px 0;
+    padding-left: 12px;
+    position: relative;
+    line-height: 1.4;
+  }
+  .feature-card li::before { content: '▸'; position: absolute; left: 0; color: #fbbf24; font-size: 0.5rem; top: 3px; }
+
+  /* ─── LEGEND ─── */
+  .legend {
+    max-width: 1100px;
+    margin: 0 auto 20px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.62rem; color: #94a3b8; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<h1>A-VI Command — Mobile UI Mockup</h1>
+<p class="subtitle">Samsung Galaxy S26 Ultra · 430px viewport · PWA-ready · 3 หน้าหลัก</p>
+
+<div class="screens-row">
+
+  <!-- ═══════════════════════════════════════════
+       SCREEN 1: HOME — AGENT SELECTION
+  ═══════════════════════════════════════════ -->
+  <div class="screen-wrapper">
+    <div class="screen-label">1 — หน้าแรก / เลือก Agent</div>
+    <div class="phone">
+      <!-- Status bar -->
+      <div class="status-bar">
+        <span>9:41</span>
+        <span>●●● 5G  🔋</span>
+      </div>
+      <!-- Header -->
+      <div class="app-header">
+        <div class="app-logo">
+          <div class="logo-dot">VI</div>
+          <div class="logo-text">A-VI Command</div>
+        </div>
+        <div class="header-actions">
+          <div class="icon-btn">🔑</div>
+          <div class="icon-btn">☀️</div>
+        </div>
+      </div>
+      <!-- Ticker -->
+      <div class="ticker">
+        <div class="tick-chip">PTT <span class="up">↑33.5</span></div>
+        <div class="tick-chip">ADVANC <span class="up">↑205</span></div>
+        <div class="tick-chip">SCB <span class="dn">↓118</span></div>
+        <div class="tick-chip">KBANK <span class="up">↑132</span></div>
+        <div class="tick-chip">SET <span class="up">↑1,295</span></div>
+      </div>
+
+      <!-- Screen content -->
+      <div class="screen-content">
+        <div class="section-title">🏢 เลือก AI Advisor</div>
+
+        <div class="agent-grid">
+          <!-- Command dept -->
+          <div class="agent-card gold selected" style="grid-column: span 3; flex-direction: row; padding: 8px 10px; gap: 8px;">
+            <div class="agent-avatar" style="background: rgba(251,191,36,0.15);">👩‍💼</div>
+            <div>
+              <div class="agent-name" style="text-align:left;">แพร — Chief of Staff</div>
+              <div class="agent-role" style="text-align:left; margin-top:2px;">จัดการทีม · วิเคราะห์ภาพรวม</div>
+            </div>
+            <div class="agent-badge badge-gold" style="margin-left:auto; align-self:center;">CMD</div>
+          </div>
+
+          <!-- Research dept -->
+          <div class="agent-card sky">
+            <div class="agent-avatar" style="background:rgba(56,189,248,0.1);">👨‍🔬</div>
+            <div class="agent-name">วิชัย</div>
+            <div class="agent-role">VI Analyst</div>
+            <div class="agent-badge badge-sky">RES</div>
+          </div>
+          <div class="agent-card sky">
+            <div class="agent-avatar" style="background:rgba(56,189,248,0.1);">👩‍💼</div>
+            <div class="agent-name">ซาร่า</div>
+            <div class="agent-role">Global Analyst</div>
+            <div class="agent-badge badge-sky">RES</div>
+          </div>
+          <div class="agent-card sky">
+            <div class="agent-avatar" style="background:rgba(56,189,248,0.1);">👨‍💼</div>
+            <div class="agent-name">กิตติ์</div>
+            <div class="agent-role">Fund & Tax</div>
+            <div class="agent-badge badge-sky">RES</div>
+          </div>
+
+          <!-- Intel dept -->
+          <div class="agent-card teal">
+            <div class="agent-avatar" style="background:rgba(45,212,191,0.1);">👩‍💻</div>
+            <div class="agent-name">มินตรา</div>
+            <div class="agent-role">Dividend</div>
+            <div class="agent-badge badge-teal">INT</div>
+          </div>
+          <div class="agent-card teal">
+            <div class="agent-avatar" style="background:rgba(45,212,191,0.1);">👨‍💻</div>
+            <div class="agent-name">ณัฐ</div>
+            <div class="agent-role">Market Scout</div>
+            <div class="agent-badge badge-teal">INT</div>
+          </div>
+          <div class="agent-card teal">
+            <div class="agent-avatar" style="background:rgba(45,212,191,0.1);">👨‍🏫</div>
+            <div class="agent-name">ดร.ปิยะ</div>
+            <div class="agent-role">Macro</div>
+            <div class="agent-badge badge-teal">INT</div>
+          </div>
+
+          <!-- Control dept -->
+          <div class="agent-card violet" style="grid-column: span 1.5;">
+            <div class="agent-avatar" style="background:rgba(167,139,250,0.1);">🧑‍⚖️</div>
+            <div class="agent-name">สมชาย</div>
+            <div class="agent-role">Risk Manager</div>
+            <div class="agent-badge badge-violet">CTL</div>
+          </div>
+          <div class="agent-card violet" style="grid-column: span 2;">
+            <div class="agent-avatar" style="background:rgba(167,139,250,0.1);">👩‍🏫</div>
+            <div class="agent-name">อ.วรรณ</div>
+            <div class="agent-role">Coach</div>
+            <div class="agent-badge badge-violet">CTL</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAB -->
+      <div class="fab">💬</div>
+
+      <!-- Bottom Nav -->
+      <div class="bottom-nav">
+        <div class="nav-item active">
+          <div class="nav-icon">🏠</div>
+          <div class="nav-label" style="color:#fbbf24;">หน้าแรก</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">💬</div>
+          <div class="nav-label">แชท</div>
+          <div class="nav-dot"></div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">📊</div>
+          <div class="nav-label">พอร์ต</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">📈</div>
+          <div class="nav-label">Watchlist</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">⚙️</div>
+          <div class="nav-label">ตั้งค่า</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SCREEN 2: CHAT
+  ═══════════════════════════════════════════ -->
+  <div class="screen-wrapper">
+    <div class="screen-label">2 — หน้าแชท</div>
+    <div class="phone">
+      <div class="status-bar">
+        <span>9:41</span>
+        <span>●●● 5G  🔋</span>
+      </div>
+      <div class="app-header">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="font-size:0.65rem; color:#94a3b8; cursor:pointer;">‹ กลับ</div>
+          <div class="agent-avatar" style="width:26px;height:26px;border-radius:50%;background:rgba(251,191,36,0.15);font-size:0.75rem;display:flex;align-items:center;justify-content:center;">👩‍💼</div>
+          <div>
+            <div style="font-size:0.65rem; font-weight:700; color:#fde68a;">แพร</div>
+            <div style="font-size:0.42rem; color:#34d399;">● Online</div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <div class="icon-btn">📋</div>
+          <div class="icon-btn">⋯</div>
+        </div>
+      </div>
+
+      <!-- Agent strip -->
+      <div class="chat-agent-strip">
+        <div class="chat-agent-pill active">
+          <div class="pill-avatar">👩‍💼</div>
+          <div class="pill-name" style="color:#fde68a;">แพร</div>
+        </div>
+        <div class="chat-agent-pill">
+          <div class="pill-avatar">👨‍🔬</div>
+          <div class="pill-name">วิชัย</div>
+        </div>
+        <div class="chat-agent-pill">
+          <div class="pill-avatar">👩‍💼</div>
+          <div class="pill-name">ซาร่า</div>
+        </div>
+        <div class="chat-agent-pill">
+          <div class="pill-avatar">👩‍💻</div>
+          <div class="pill-name">มินตรา</div>
+        </div>
+        <div class="chat-agent-pill">
+          <div class="pill-avatar">👨‍💻</div>
+          <div class="pill-name">ณัฐ</div>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div class="screen-content">
+        <div class="chat-messages">
+          <div class="msg agent">
+            <div class="msg-sender">แพร · Chief of Staff</div>
+            สวัสดีครับ วันนี้ต้องการสอบถามอะไรเกี่ยวกับพอร์ตการลงทุนของคุณบ้างครับ?
+          </div>
+          <div class="msg user">
+            วิเคราะห์หุ้น PTT ให้หน่อยได้ไหมครับ มีแนวโน้มอย่างไร
+          </div>
+          <div class="msg agent">
+            <div class="msg-sender">แพร · กำลังตอบ...</div>
+            <div class="typing">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="chat-input-area">
+        <div style="display:flex;gap:4px;align-self:flex-end;">
+          <div class="icon-btn" style="width:28px;height:28px;font-size:0.7rem;">📎</div>
+          <div class="icon-btn" style="width:28px;height:28px;font-size:0.7rem;">🎤</div>
+        </div>
+        <div class="chat-textarea">พิมพ์คำถาม เช่น "PTT น่าซื้อไหม?"</div>
+        <div class="send-btn">➤</div>
+      </div>
+
+      <!-- Bottom Nav -->
+      <div class="bottom-nav">
+        <div class="nav-item">
+          <div class="nav-icon">🏠</div>
+          <div class="nav-label">หน้าแรก</div>
+        </div>
+        <div class="nav-item active">
+          <div class="nav-icon">💬</div>
+          <div class="nav-label" style="color:#fbbf24;">แชท</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">📊</div>
+          <div class="nav-label">พอร์ต</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">📈</div>
+          <div class="nav-label">Watchlist</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">⚙️</div>
+          <div class="nav-label">ตั้งค่า</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SCREEN 3: DASHBOARD / PORTFOLIO
+  ═══════════════════════════════════════════ -->
+  <div class="screen-wrapper">
+    <div class="screen-label">3 — Dashboard / พอร์ต</div>
+    <div class="phone">
+      <div class="status-bar">
+        <span>9:41</span>
+        <span>●●● 5G  🔋</span>
+      </div>
+      <div class="app-header">
+        <div class="app-logo">
+          <div class="logo-dot">VI</div>
+          <div class="logo-text">Portfolio</div>
+        </div>
+        <div class="header-actions">
+          <div class="icon-btn">➕</div>
+          <div class="icon-btn">⋯</div>
+        </div>
+      </div>
+      <!-- Ticker -->
+      <div class="ticker">
+        <div class="tick-chip">SET <span class="up">↑1,295</span></div>
+        <div class="tick-chip">PTT <span class="up">↑33.5 +1.2%</span></div>
+        <div class="tick-chip">ADVANC <span class="up">↑205</span></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="dash-tabs">
+        <div class="dash-tab">ภาพรวม</div>
+        <div class="dash-tab active">พอร์ต</div>
+        <div class="dash-tab">ปันผล</div>
+        <div class="dash-tab">Watchlist</div>
+      </div>
+
+      <div class="screen-content">
+        <div class="dash-content">
+          <!-- Summary metrics -->
+          <div class="metric-row">
+            <div class="metric-card">
+              <div class="metric-label">มูลค่าพอร์ต</div>
+              <div class="metric-value" style="font-size:0.75rem;">฿485,200</div>
+              <div class="metric-sub">▲ +฿12,400 (+2.6%)</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">กำไร/ขาดทุน</div>
+              <div class="metric-value" style="font-size:0.75rem; color:#34d399;">+฿12,400</div>
+              <div class="metric-sub">วันนี้ +฿1,200</div>
+            </div>
+          </div>
+
+          <!-- Portfolio items -->
+          <div class="section-title" style="padding: 6px 0 6px;">หุ้นในพอร์ต</div>
+
+          <div class="portfolio-item">
+            <div class="stock-info">
+              <div class="stock-ticker">PTT</div>
+              <div class="stock-name">PTT PCL · 1,000 หุ้น</div>
+            </div>
+            <div class="stock-pnl">
+              <div class="pnl-value green">+฿4,200</div>
+              <div class="pnl-pct">+14.3% · ฿33.50</div>
+            </div>
+          </div>
+
+          <div class="portfolio-item">
+            <div class="stock-info">
+              <div class="stock-ticker">ADVANC</div>
+              <div class="stock-name">Advanced Info · 200 หุ้น</div>
+            </div>
+            <div class="stock-pnl">
+              <div class="pnl-value green">+฿6,000</div>
+              <div class="pnl-pct">+3.1% · ฿205</div>
+            </div>
+          </div>
+
+          <div class="portfolio-item">
+            <div class="stock-info">
+              <div class="stock-ticker">SCB</div>
+              <div class="stock-name">SCB X · 500 หุ้น</div>
+            </div>
+            <div class="stock-pnl">
+              <div class="pnl-value red">-฿2,000</div>
+              <div class="pnl-pct">-3.3% · ฿118</div>
+            </div>
+          </div>
+
+          <div class="portfolio-item">
+            <div class="stock-info">
+              <div class="stock-ticker">KBANK</div>
+              <div class="stock-name">Kasikorn · 300 หุ้น</div>
+            </div>
+            <div class="stock-pnl">
+              <div class="pnl-value green">+฿4,200</div>
+              <div class="pnl-pct">+11.7% · ฿132</div>
+            </div>
+          </div>
+
+          <div style="height: 8px;"></div>
+        </div>
+      </div>
+
+      <!-- FAB -->
+      <div class="fab" style="bottom:68px;">➕</div>
+
+      <!-- Bottom Nav -->
+      <div class="bottom-nav">
+        <div class="nav-item">
+          <div class="nav-icon">🏠</div>
+          <div class="nav-label">หน้าแรก</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">💬</div>
+          <div class="nav-label">แชท</div>
+        </div>
+        <div class="nav-item active">
+          <div class="nav-icon">📊</div>
+          <div class="nav-label" style="color:#fbbf24;">พอร์ต</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">📈</div>
+          <div class="nav-label">Watchlist</div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">⚙️</div>
+          <div class="nav-label">ตั้งค่า</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end screens-row -->
+
+<!-- ═══════════════════════════════════════════
+     FEATURE ANNOTATIONS
+═══════════════════════════════════════════ -->
+<div class="annotations">
+  <h2>📋 สิ่งที่จะปรับปรุง / เพิ่มใหม่</h2>
+  <div class="feature-grid">
+
+    <div class="feature-card">
+      <h3>📱 PWA Installation</h3>
+      <ul>
+        <li>เพิ่ม manifest.json พร้อม icons ทุกขนาด</li>
+        <li>Service Worker สำหรับ cache assets offline</li>
+        <li>Install prompt สำหรับ Add to Home Screen</li>
+        <li>Splash screen ขณะโหลด App</li>
+        <li>Theme color เข้ากับ System UI</li>
+        <li>Standalone display mode</li>
+      </ul>
+    </div>
+
+    <div class="feature-card">
+      <h3>🧭 Bottom Navigation Bar</h3>
+      <ul>
+        <li>แทน sidebar ด้วย Bottom Nav 5 ปุ่ม</li>
+        <li>Active state + animation</li>
+        <li>Badge notification (unread chat)</li>
+        <li>Safe area inset สำหรับ punch-hole screen</li>
+        <li>Haptic feedback on tap (Web Vibration API)</li>
+      </ul>
+    </div>
+
+    <div class="feature-card">
+      <h3>🃏 Agent Grid (Mobile)</h3>
+      <ul>
+        <li>3 คอลัมน์ แทน 4 คอลัมน์เดิม</li>
+        <li>Chief card แสดงเต็มแถว (featured)</li>
+        <li>Compact card: avatar + ชื่อ + แผนก</li>
+        <li>Tap card → ไปหน้าแชทกับ Agent นั้นเลย</li>
+        <li>FAB "💬" เพื่อเปิดแชทเร็ว</li>
+      </ul>
+    </div>
+
+    <div class="feature-card">
+      <h3>💬 Chat Interface</h3>
+      <ul>
+        <li>Horizontal scroll pill เพื่อสลับ Agent</li>
+        <li>Back button กลับหน้าแรก</li>
+        <li>Keyboard-aware layout (วิ่งขึ้นเมื่อ keyboard เปิด)</li>
+        <li>ไมค์ปุ่ม (เผื่อ voice input อนาคต)</li>
+        <li>Attachment button</li>
+        <li>Bubble UI ชัดเจน user vs agent</li>
+      </ul>
+    </div>
+
+    <div class="feature-card">
+      <h3>📊 Dashboard</h3>
+      <ul>
+        <li>Summary metric cards แบบ 2 คอลัมน์</li>
+        <li>Portfolio list แบบ swipeable cards</li>
+        <li>Tab: ภาพรวม / พอร์ต / ปันผล / Watchlist</li>
+        <li>Pull-to-refresh สำหรับ update ราคา</li>
+        <li>FAB ➕ เพิ่มหุ้นใหม่</li>
+      </ul>
+    </div>
+
+    <div class="feature-card">
+      <h3>⚡ Performance & UX</h3>
+      <ul>
+        <li>Safe area insets (notch / punch-hole)</li>
+        <li>Touch targets ≥ 44px ทุกปุ่ม</li>
+        <li>Prevent double-tap zoom</li>
+        <li>Overscroll behavior: none (ป้องกัน pull-to-dismiss)</li>
+        <li>System font fallback สำหรับ Thai</li>
+        <li>Dark mode ตาม System preference</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div> Command (Gold)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#38bdf8;"></div> Research (Sky)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2dd4bf;"></div> Intel (Teal)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#a78bfa;"></div> Control (Violet)</div>
+  <div style="color:#64748b; font-size:0.6rem; width:100%; text-align:center; margin-top:8px;">Mockup นี้แสดงโครงสร้าง UI เท่านั้น · ยังไม่ได้แก้ไข Code จริง</div>
+</div>
+
+</body>
+</html>
